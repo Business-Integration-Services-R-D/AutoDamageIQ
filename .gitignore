@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Node
+frontend/node_modules/
+npm-debug.log
+yarn-error.log
+
+# Large files & datasets
+datasets/
+models/*.pt
+*.tar.gz
+*.zip
+*.h5
+*.onnx
+
+# Training outputs
+training/jobs/
+src/yolo/runs/
+src/autodamageid/data/carparts_seg/images/
+src/autodamageid/data/carparts_seg/labels/
+*.cache
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+-e 
+# Environment files
+*.env
+*.env.*
+-e 
+# Environment files
+*.env
+*.env.*

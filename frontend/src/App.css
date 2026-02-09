@@ -1,0 +1,63 @@
+/* Additional App styles */
+.severity-dots {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.severity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.severity-dot.filled {
+  background-color: #FF3B30;
+}
+
+.severity-dot.empty {
+  background-color: #E5E5E7;
+}
+
+/* Canvas overlay */
+.canvas-container {
+  position: relative;
+}
+
+.canvas-container canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/* Callout card */
+.callout-card {
+  position: absolute;
+  background: white;
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  min-width: 160px;
+  z-index: 10;
+}
+
+.callout-card::before {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: white;
+  transform: rotate(45deg);
+}
+
+.callout-card.left::before {
+  right: -4px;
+  top: 50%;
+  margin-top: -4px;
+}
+
+.callout-card.right::before {
+  left: -4px;
+  top: 50%;
+  margin-top: -4px;
+}
