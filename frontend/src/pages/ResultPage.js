@@ -113,7 +113,6 @@ const ResultPage = () => {
     if (!canvas || !image || !analysis) return;
 
     const ctx = canvas.getContext('2d');
-    const rect = image.getBoundingClientRect();
     const containerRect = image.parentElement.getBoundingClientRect();
     
     canvas.width = containerRect.width;
