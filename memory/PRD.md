@@ -91,7 +91,6 @@ AutoDamageIQ, araç dış ve iç görüntülerini analiz ederek filo yönetimi v
 
 ### P1 — Sonraki Adımlar
 - [ ] Ar-Ge dokümanlarındaki tutarsızlıkların düzeltilmesi (hasar sınıf isimleri, literatür taraması)
-- [ ] SAM ölçü kalibrasyonunun iyileştirilmesi (referans ölçek)
 
 ### P2 — Orta Öncelik
 - [ ] server.py modüler refactoring (APIRouter yapısı)
