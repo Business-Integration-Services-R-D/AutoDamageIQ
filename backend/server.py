@@ -37,6 +37,8 @@ from ultralytics import YOLO
 from image_quality import assess_image_quality
 from repair_engine import get_repair_recommendation
 from anomaly_detector import compute_phash, check_duplicate_image, generate_anomaly_score
+from sam_integration import is_sam_available, enhance_damages_with_sam, get_sam_status
+from before_after import compare_analyses
 
 # Initialize FastAPI
 app = FastAPI(
@@ -281,7 +283,7 @@ def calculate_enhanced_severity(damage_type: str, box: list, image_w: int, image
     }
 
 
-def analyze_image(image_np: np.ndarray) -> Dict[str, Any]:
+def analyze_image(image_np: np.ndarray, enable_sam: bool = True) -> Dict[str, Any]:
     """Run damage detection and parts segmentation on image"""
     
     damage_mod = get_damage_model()
@@ -414,8 +416,20 @@ def analyze_image(image_np: np.ndarray) -> Dict[str, Any]:
             "needs_review": bool(needs_review),
             "review_reasons": review_reasons
         },
-        "image_size": {"width": int(w), "height": int(h)}
+        "image_size": {"width": int(w), "height": int(h)},
+        "sam_available": is_sam_available()
     }
+    
+    # SAM enhancement (optional)
+    if enable_sam and is_sam_available() and len(damages) > 0:
+        try:
+            result["damages"] = enhance_damages_with_sam(image_np, damages)
+            result["sam_used"] = True
+        except Exception as e:
+            print(f"SAM enhancement error: {e}")
+            result["sam_used"] = False
+    else:
+        result["sam_used"] = False
     
     # Convert all numpy types to native Python types
     return convert_numpy_types(result)
@@ -620,6 +634,141 @@ async def quality_check(file: UploadFile = File(...)):
     
     quality_result = assess_image_quality(image_np)
     return quality_result
+
+# =============================================================================
+# SAM STATUS ENDPOINT
+# =============================================================================
+
+@app.get("/api/sam/status")
+async def sam_status():
+    """SAM model durumunu dondur"""
+    return get_sam_status()
+
+# =============================================================================
+# BEFORE/AFTER KARSILASTIRMA ENDPOINT'LERI
+# =============================================================================
+
+class CompareRequest(BaseModel):
+    before_id: str
+    after_id: str
+
+@app.post("/api/compare")
+async def compare_before_after(request: CompareRequest):
+    """Iki analizi karsilastir - yeni hasar tespiti"""
+    
+    # Before analizi
+    before_doc = analyses_collection.find_one({"_id": request.before_id})
+    if not before_doc:
+        raise HTTPException(status_code=404, detail="Onceki analiz bulunamadi")
+    
+    # After analizi
+    after_doc = analyses_collection.find_one({"_id": request.after_id})
+    if not after_doc:
+        raise HTTPException(status_code=404, detail="Sonraki analiz bulunamadi")
+    
+    # Gorselleri decode et
+    before_img_data = base64.b64decode(before_doc["image_base64"])
+    after_img_data = base64.b64decode(after_doc["image_base64"])
+    
+    before_np = cv2.imdecode(np.frombuffer(before_img_data, np.uint8), cv2.IMREAD_COLOR)
+    after_np = cv2.imdecode(np.frombuffer(after_img_data, np.uint8), cv2.IMREAD_COLOR)
+    
+    if before_np is None or after_np is None:
+        raise HTTPException(status_code=500, detail="Gorseller okunamadi")
+    
+    # Hasar listelerini al
+    before_damages = before_doc.get("results", {}).get("damages", [])
+    after_damages = after_doc.get("results", {}).get("damages", [])
+    
+    # Karsilastirma yap
+    comparison = compare_analyses(before_np, after_np, before_damages, after_damages)
+    comparison = convert_to_native_types(comparison)
+    
+    # Karsilastirma kaydini MongoDB'ye kaydet
+    comparison_id = str(uuid.uuid4())
+    comparison_doc = {
+        "_id": comparison_id,
+        "before_id": request.before_id,
+        "after_id": request.after_id,
+        "created_at": datetime.utcnow().isoformat(),
+        "result": comparison
+    }
+    db.comparisons.insert_one(comparison_doc)
+    
+    return {
+        "id": comparison_id,
+        "before_id": request.before_id,
+        "after_id": request.after_id,
+        **comparison
+    }
+
+@app.post("/api/compare/upload")
+async def compare_upload(
+    before_file: UploadFile = File(...),
+    after_file: UploadFile = File(...)
+):
+    """Iki gorsel yukleyerek dogrudan karsilastirma yap"""
+    
+    # Before gorseli
+    before_contents = await before_file.read()
+    before_np = cv2.imdecode(np.frombuffer(before_contents, np.uint8), cv2.IMREAD_COLOR)
+    if before_np is None:
+        raise HTTPException(status_code=400, detail="Onceki gorsel okunamadi")
+    
+    # After gorseli
+    after_contents = await after_file.read()
+    after_np = cv2.imdecode(np.frombuffer(after_contents, np.uint8), cv2.IMREAD_COLOR)
+    if after_np is None:
+        raise HTTPException(status_code=400, detail="Sonraki gorsel okunamadi")
+    
+    # Her iki gorseli analiz et
+    before_results = analyze_image(before_np, enable_sam=False)
+    after_results = analyze_image(after_np, enable_sam=False)
+    
+    before_results = convert_to_native_types(before_results)
+    after_results = convert_to_native_types(after_results)
+    
+    # Karsilastirma
+    comparison = compare_analyses(
+        before_np, after_np,
+        before_results.get("damages", []),
+        after_results.get("damages", [])
+    )
+    comparison = convert_to_native_types(comparison)
+    
+    return {
+        "before_analysis": {
+            "damage_count": before_results["summary"]["total_damages"],
+            "risk_level": before_results["summary"]["risk_level"],
+            "damages": before_results["damages"]
+        },
+        "after_analysis": {
+            "damage_count": after_results["summary"]["total_damages"],
+            "risk_level": after_results["summary"]["risk_level"],
+            "damages": after_results["damages"]
+        },
+        **comparison
+    }
+
+@app.get("/api/comparisons")
+async def list_comparisons(limit: int = 20):
+    """Gecmis karsilastirmalari listele"""
+    comparisons = list(
+        db.comparisons.find().sort("created_at", -1).limit(limit)
+    )
+    
+    return [
+        {
+            "id": str(c["_id"]),
+            "before_id": c["before_id"],
+            "after_id": c["after_id"],
+            "created_at": c["created_at"],
+            "has_new_damage": c["result"]["has_new_damage"],
+            "verdict": c["result"]["verdict"],
+            "new_damage_count": c["result"]["new_damage_count"]
+        }
+        for c in comparisons
+    ]
 
 @app.get("/api/analyses/{analysis_id}/pdf")
 async def download_pdf(analysis_id: str):

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Car, History, Upload, Brain } from 'lucide-react';
+import { Car, History, Upload, Brain, ArrowLeftRight } from 'lucide-react';
 
 const Header = () => {
   const location = useLocation();
@@ -32,6 +32,19 @@ const Header = () => {
             </span>
           </Link>
           <Link 
+            to="/compare"
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              location.pathname === '/compare' 
+                ? 'bg-black text-white' 
+                : 'text-apple-secondary hover:text-apple-text hover:bg-gray-100'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <ArrowLeftRight className="w-4 h-4" />
+              Karsilastir
+            </span>
+          </Link>
+          <Link 
             to="/history"
             className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
               location.pathname === '/history' 
@@ -41,7 +54,7 @@ const Header = () => {
           >
             <span className="flex items-center gap-2">
               <History className="w-4 h-4" />
-              Geçmiş
+              Gecmis
             </span>
           </Link>
           <Link 
@@ -54,7 +67,7 @@ const Header = () => {
           >
             <span className="flex items-center gap-2">
               <Brain className="w-4 h-4" />
-              Eğitim
+              Egitim
             </span>
           </Link>
         </nav>

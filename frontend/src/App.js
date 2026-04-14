@@ -5,6 +5,7 @@ import UploadPage from './pages/UploadPage';
 import ResultPage from './pages/ResultPage';
 import HistoryPage from './pages/HistoryPage';
 import TrainingPage from './pages/TrainingPage';
+import ComparePage from './pages/ComparePage';
 import './App.css';
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
             <Route path="/result/:id" element={<ResultPage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/training" element={<TrainingPage />} />
+            <Route path="/compare" element={<ComparePage />} />
           </Routes>
         </main>
       </div>

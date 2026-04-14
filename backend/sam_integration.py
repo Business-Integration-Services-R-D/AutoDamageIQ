@@ -1,291 +1,248 @@
 """
-SAM (Segment Anything Model) + YOLO Hibrit Pipeline
-====================================================
-Bu modül YOLO detection sonuçlarını SAM ile pixel-level segmentasyona dönüştürür.
+AutoDamageIQ - SAM (Segment Anything Model) + YOLO Hibrit Pipeline
+===================================================================
+YOLO bounding box'larindan SAM ile piksel duzeyinde hassas maske uretir.
+Hasar alani (piksel ve tahmini cm2) hesaplar.
 """
 
-import os
 import numpy as np
 import torch
 import cv2
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 
-# SAM availability flag
-SAM_AVAILABLE = False
-sam_model = None
-sam_predictor = None
+# SAM state
+_sam_model = None
+_sam_predictor = None
+_sam_available = None  # None = not checked yet
 
-def check_sam_availability() -> bool:
-    """SAM kullanılabilirliğini kontrol et"""
-    global SAM_AVAILABLE
+
+SAM_CHECKPOINT_PATH = Path("/app/models/sam_vit_b_01ec64.pth")
+SAM_MODEL_TYPE = "vit_b"
+
+
+def is_sam_available() -> bool:
+    """SAM kullanilabilirligini kontrol et (lazy check)"""
+    global _sam_available
+    if _sam_available is not None:
+        return _sam_available
+    
     try:
         from segment_anything import sam_model_registry, SamPredictor
-        SAM_AVAILABLE = True
-        return True
+        if SAM_CHECKPOINT_PATH.exists():
+            _sam_available = True
+        else:
+            _sam_available = False
+            print(f"SAM checkpoint bulunamadi: {SAM_CHECKPOINT_PATH}")
     except ImportError:
-        SAM_AVAILABLE = False
-        return False
+        _sam_available = False
+        print("segment-anything kutuphanesi yuklu degil")
+    
+    return _sam_available
 
-def get_sam_checkpoint_path() -> Optional[Path]:
-    """SAM checkpoint dosyasını bul veya indir"""
-    # Olası konumlar
-    possible_paths = [
-        Path("/app/models/sam_vit_b_01ec64.pth"),  # ViT-B (daha küçük)
-        Path("/app/models/sam_vit_h_4b8939.pth"),  # ViT-H (daha büyük)
-        Path.home() / ".cache" / "sam" / "sam_vit_b_01ec64.pth",
-    ]
-    
-    for path in possible_paths:
-        if path.exists():
-            return path
-    
-    return None
 
-def initialize_sam(model_type: str = "vit_b") -> bool:
-    """SAM modelini başlat"""
-    global sam_model, sam_predictor, SAM_AVAILABLE
+def _get_predictor():
+    """SAM predictor'u lazy-load et"""
+    global _sam_model, _sam_predictor
     
-    if not check_sam_availability():
-        print("⚠️ SAM kütüphanesi yüklü değil")
-        return False
+    if _sam_predictor is not None:
+        return _sam_predictor
     
-    checkpoint_path = get_sam_checkpoint_path()
-    if checkpoint_path is None:
-        print("⚠️ SAM checkpoint dosyası bulunamadı")
-        print("   İndirmek için: https://github.com/facebookresearch/segment-anything#model-checkpoints")
-        return False
+    if not is_sam_available():
+        return None
     
     try:
         from segment_anything import sam_model_registry, SamPredictor
         
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(f"🔄 SAM yükleniyor ({model_type}) - Device: {device}")
+        print(f"SAM yukleniyor ({SAM_MODEL_TYPE}) - Device: {device}")
         
-        sam_model = sam_model_registry[model_type](checkpoint=str(checkpoint_path))
-        sam_model.to(device)
-        sam_predictor = SamPredictor(sam_model)
+        _sam_model = sam_model_registry[SAM_MODEL_TYPE](checkpoint=str(SAM_CHECKPOINT_PATH))
+        _sam_model.to(device)
+        _sam_predictor = SamPredictor(_sam_model)
         
-        print(f"✅ SAM başarıyla yüklendi")
-        return True
+        print("SAM basariyla yuklendi")
+        return _sam_predictor
     except Exception as e:
-        print(f"❌ SAM yükleme hatası: {e}")
-        return False
+        print(f"SAM yukleme hatasi: {e}")
+        _sam_available = False  # Don't retry
+        return None
 
-def get_sam_mask_for_box(
-    image_rgb: np.ndarray, 
-    box: List[float],
-    multimask: bool = False
+
+def generate_mask_for_box(
+    image_rgb: np.ndarray,
+    box: List[float]
 ) -> Optional[Dict[str, Any]]:
     """
-    Verilen bounding box için SAM ile segmentasyon maskesi oluştur
+    Verilen bounding box icin SAM ile segmentasyon maskesi olustur.
     
     Args:
-        image_rgb: RGB formatında görsel (numpy array)
-        box: [x1, y1, x2, y2] formatında bounding box
-        multimask: Birden fazla maske üret
+        image_rgb: RGB formatinda gorsel (H, W, 3)
+        box: [x1, y1, x2, y2] formatinda bounding box
     
     Returns:
-        Dict: mask, score, area bilgileri
+        mask_data dict veya None
     """
-    global sam_predictor
-    
-    if sam_predictor is None:
-        if not initialize_sam():
-            return None
+    predictor = _get_predictor()
+    if predictor is None:
+        return None
     
     try:
-        # Görseli SAM'e set et
-        sam_predictor.set_image(image_rgb)
+        predictor.set_image(image_rgb)
         
-        # Box'ı numpy array'e çevir
-        box_np = np.array(box).astype(np.int32)
+        box_np = np.array(box, dtype=np.float32)
         
-        # Maske tahmin et
-        masks, scores, logits = sam_predictor.predict(
+        masks, scores, _ = predictor.predict(
             box=box_np,
-            multimask_output=multimask
+            multimask_output=True
         )
         
-        # En iyi maskeyi seç
-        if multimask:
-            best_idx = np.argmax(scores)
-            mask = masks[best_idx]
-            score = scores[best_idx]
-        else:
-            mask = masks[0]
-            score = scores[0]
+        # En iyi maskeyi sec
+        best_idx = int(np.argmax(scores))
+        mask = masks[best_idx]
+        score = float(scores[best_idx])
         
-        # Maske alanını hesapla
+        # Maske alanini hesapla
         area_pixels = int(np.sum(mask))
         
-        # Maske konturu bul
+        # Kontur bul ve polygon olustur
         contours, _ = cv2.findContours(
-            mask.astype(np.uint8), 
-            cv2.RETR_EXTERNAL, 
+            mask.astype(np.uint8),
+            cv2.RETR_EXTERNAL,
             cv2.CHAIN_APPROX_SIMPLE
         )
         
-        # En büyük konturu al
         polygon = []
         if contours:
-            largest_contour = max(contours, key=cv2.contourArea)
-            # Konturu basitleştir
-            epsilon = 0.005 * cv2.arcLength(largest_contour, True)
-            approx = cv2.approxPolyDP(largest_contour, epsilon, True)
-            polygon = approx.squeeze().tolist()
-            if isinstance(polygon[0], int):
-                polygon = [polygon]
+            largest = max(contours, key=cv2.contourArea)
+            epsilon = 0.005 * cv2.arcLength(largest, True)
+            approx = cv2.approxPolyDP(largest, epsilon, True)
+            pts = approx.squeeze()
+            if pts.ndim == 2 and len(pts) >= 3:
+                polygon = pts.tolist()
         
         return {
-            "mask": mask,
-            "score": float(score),
+            "mask_score": score,
             "area_pixels": area_pixels,
             "polygon": polygon,
-            "bbox": box
+            "polygon_point_count": len(polygon)
         }
     
     except Exception as e:
-        print(f"SAM maske hatası: {e}")
+        print(f"SAM maske hatasi: {e}")
         return None
 
-def calculate_damage_area(
+
+def calculate_damage_measurements(
     mask_data: Dict[str, Any],
     image_width: int,
     image_height: int,
-    reference_size_cm: float = 450.0  # Ortalama araç uzunluğu
-) -> Dict[str, float]:
+    reference_length_cm: float = 450.0
+) -> Dict[str, Any]:
     """
-    Hasar alanını hesapla (tahmini cm²)
+    Maske verisinden hasar olcu bilgisi hesapla.
     
-    Args:
-        mask_data: SAM maske verisi
-        image_width: Görsel genişliği
-        image_height: Görsel yüksekliği
-        reference_size_cm: Referans boyut (araç uzunluğu varsayılan 450cm)
-    
-    Returns:
-        Dict: Alan hesaplamaları
+    Varsayim: Gorsel aracin buyuk bir bolumunu kapsiyor.
+    reference_length_cm: Ortalama arac uzunlugu (varsayilan 450cm)
     """
     area_pixels = mask_data["area_pixels"]
     total_pixels = image_width * image_height
     
-    # Pikselden cm²'ye dönüşüm (yaklaşık)
-    # Varsayım: Görsel arabanın tamamını kapsıyor
-    px_per_cm = image_width / reference_size_cm
-    area_cm2 = area_pixels / (px_per_cm ** 2)
+    # Piksel basina cm orani
+    px_per_cm = image_width / reference_length_cm
+    area_cm2 = area_pixels / (px_per_cm ** 2) if px_per_cm > 0 else 0
     
-    # Yüzde hesapla
-    percentage = (area_pixels / total_pixels) * 100
+    # Gorsel yuzdesine gore alan
+    area_percentage = (area_pixels / max(1, total_pixels)) * 100
+    
+    # Boyut bandi
+    if area_cm2 < 5:
+        size_band = "Cok Kucuk"
+    elif area_cm2 < 25:
+        size_band = "Kucuk"
+    elif area_cm2 < 100:
+        size_band = "Orta"
+    elif area_cm2 < 500:
+        size_band = "Buyuk"
+    else:
+        size_band = "Cok Buyuk"
     
     return {
         "area_pixels": area_pixels,
-        "area_cm2": round(area_cm2, 2),
-        "percentage": round(percentage, 3),
-        "reference_used_cm": reference_size_cm
+        "area_cm2": round(float(area_cm2), 2),
+        "area_percentage": round(float(area_percentage), 3),
+        "size_band": size_band,
+        "reference_length_cm": reference_length_cm,
+        "measurement_confidence": "tahmini"
     }
 
-def enhance_damage_with_sam(
-    image_rgb: np.ndarray,
-    damages: List[Dict[str, Any]],
-    enable_sam: bool = True
+
+def enhance_damages_with_sam(
+    image_np: np.ndarray,
+    damages: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
     """
-    YOLO detection sonuçlarını SAM ile zenginleştir
+    YOLO hasar listesini SAM maskeleri ile zenginlestir.
+    SAM kullanilabilir degilse hasarlari degistirmeden dondurur.
     
     Args:
-        image_rgb: RGB görsel
+        image_np: BGR gorsel (OpenCV format)
         damages: YOLO'dan gelen hasar listesi
-        enable_sam: SAM'i etkinleştir/devre dışı bırak
     
     Returns:
-        Zenginleştirilmiş hasar listesi
+        SAM verileri eklenmis hasar listesi
     """
-    if not enable_sam or not SAM_AVAILABLE:
+    if not is_sam_available():
+        # SAM yok — her hasara fallback bilgisi ekle
+        for dmg in damages:
+            dmg["sam_data"] = {"available": False, "reason": "SAM modeli yuklu degil"}
         return damages
     
-    h, w = image_rgb.shape[:2]
-    enhanced_damages = []
+    # BGR -> RGB
+    image_rgb = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
+    h, w = image_np.shape[:2]
     
-    for damage in damages:
-        enhanced = damage.copy()
+    for dmg in damages:
+        box = dmg.get("box", [])
+        if len(box) != 4:
+            dmg["sam_data"] = {"available": False, "reason": "Gecersiz bounding box"}
+            continue
         
-        # SAM ile maske oluştur
-        box = damage.get("box", [])
-        if len(box) == 4:
-            mask_data = get_sam_mask_for_box(image_rgb, box)
-            
-            if mask_data:
-                # Alan hesapla
-                area_info = calculate_damage_area(mask_data, w, h)
-                
-                enhanced["sam_data"] = {
-                    "score": mask_data["score"],
-                    "area": area_info,
-                    "polygon": mask_data["polygon"],
-                    "has_precise_mask": True
-                }
-            else:
-                enhanced["sam_data"] = {
-                    "has_precise_mask": False,
-                    "reason": "SAM mask generation failed"
-                }
+        mask_data = generate_mask_for_box(image_rgb, box)
         
-        enhanced_damages.append(enhanced)
+        if mask_data:
+            measurements = calculate_damage_measurements(mask_data, w, h)
+            dmg["sam_data"] = {
+                "available": True,
+                "mask_score": mask_data["mask_score"],
+                "measurements": measurements,
+                "polygon_point_count": mask_data["polygon_point_count"]
+            }
+        else:
+            dmg["sam_data"] = {"available": False, "reason": "Maske uretilemedi"}
     
-    return enhanced_damages
+    return damages
 
-def draw_sam_masks_on_image(
-    image_rgb: np.ndarray,
-    damages: List[Dict[str, Any]],
-    alpha: float = 0.4
-) -> np.ndarray:
-    """
-    SAM maskelerini görsel üzerine çiz
+
+def get_sam_status() -> Dict[str, Any]:
+    """SAM durumunu raporla"""
+    checkpoint_exists = SAM_CHECKPOINT_PATH.exists()
+    checkpoint_size_mb = round(SAM_CHECKPOINT_PATH.stat().st_size / (1024*1024), 1) if checkpoint_exists else 0
     
-    Args:
-        image_rgb: Orijinal görsel
-        damages: SAM verisi içeren hasar listesi
-        alpha: Maske transparanlığı
-    
-    Returns:
-        Maskelerin çizildiği görsel
-    """
-    overlay = image_rgb.copy()
-    output = image_rgb.copy()
-    
-    # Renk paleti
-    colors = [
-        (255, 0, 0),    # Kırmızı - Çatlak
-        (0, 255, 0),    # Yeşil - Göçük
-        (0, 0, 255),    # Mavi - Cam kırığı
-        (255, 255, 0),  # Sarı - Lamba kırığı
-        (255, 0, 255),  # Magenta - Çizik
-        (0, 255, 255),  # Cyan - Patlak lastik
-    ]
-    
-    damage_type_to_color = {
-        "crack": 0, "dent": 1, "glass_shatter": 2,
-        "lamp_broken": 3, "scratch": 4, "tire_flat": 5
+    return {
+        "library_installed": _check_library(),
+        "checkpoint_exists": checkpoint_exists,
+        "checkpoint_path": str(SAM_CHECKPOINT_PATH),
+        "checkpoint_size_mb": checkpoint_size_mb,
+        "model_type": SAM_MODEL_TYPE,
+        "model_loaded": _sam_predictor is not None,
+        "device": str(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
     }
-    
-    for damage in damages:
-        sam_data = damage.get("sam_data", {})
-        polygon = sam_data.get("polygon", [])
-        damage_type = damage.get("type", "unknown")
-        
-        color_idx = damage_type_to_color.get(damage_type, 0)
-        color = colors[color_idx % len(colors)]
-        
-        if polygon and len(polygon) > 2:
-            pts = np.array(polygon, dtype=np.int32)
-            cv2.fillPoly(overlay, [pts], color)
-            cv2.polylines(output, [pts], True, color, 2)
-    
-    # Overlay blend
-    cv2.addWeighted(overlay, alpha, output, 1 - alpha, 0, output)
-    
-    return output
 
-# Modül yüklendiğinde SAM durumunu kontrol et
-check_sam_availability()
+
+def _check_library() -> bool:
+    try:
+        from segment_anything import sam_model_registry
+        return True
+    except ImportError:
+        return False
