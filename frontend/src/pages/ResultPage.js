@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Download, Loader2, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, AlertTriangle, CheckCircle, XCircle, Shield, ShieldAlert, Wrench, Eye, ImageOff } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
@@ -23,15 +23,54 @@ const SeverityDots = ({ severity }) => {
 // Risk badge component
 const RiskBadge = ({ level }) => {
   const colors = {
-    'Düşük': 'bg-green-100 text-green-700',
+    'Dusuk': 'bg-green-100 text-green-700',
     'Orta': 'bg-orange-100 text-orange-700',
-    'Yüksek': 'bg-red-100 text-red-700'
+    'Yuksek': 'bg-red-100 text-red-700'
   };
   
   return (
     <span className={`px-3 py-1 rounded-full text-sm font-medium ${colors[level] || 'bg-gray-100 text-gray-700'}`}>
       {level}
     </span>
+  );
+};
+
+// Repair badge component
+const RepairBadge = ({ repairType }) => {
+  const colors = {
+    'Lokal Boya': 'bg-blue-50 text-blue-700 border-blue-200',
+    'Kaporta Duzeltme': 'bg-amber-50 text-amber-700 border-amber-200',
+    'Parca Degisimi': 'bg-red-50 text-red-700 border-red-200',
+    'Cam Degisimi': 'bg-purple-50 text-purple-700 border-purple-200',
+    'Far/Lamba Degisimi': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    'Lastik Degisimi': 'bg-orange-50 text-orange-700 border-orange-200',
+    'Detayli Inceleme Gerekli': 'bg-gray-50 text-gray-700 border-gray-200',
+  };
+  
+  return (
+    <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${colors[repairType] || 'bg-gray-50 text-gray-700 border-gray-200'}`}>
+      {repairType}
+    </span>
+  );
+};
+
+// Quality indicator component
+const QualityIndicator = ({ quality }) => {
+  if (!quality) return null;
+  
+  const colors = {
+    'Yuksek': 'text-green-600',
+    'Orta': 'text-amber-600',
+    'Dusuk': 'text-red-600'
+  };
+  
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className={`w-2 h-2 rounded-full ${quality.quality_level === 'Yuksek' ? 'bg-green-500' : quality.quality_level === 'Orta' ? 'bg-amber-500' : 'bg-red-500'}`} />
+      <span className={`text-sm font-medium ${colors[quality.quality_level] || 'text-gray-600'}`}>
+        {quality.quality_level} (%{quality.quality_score})
+      </span>
+    </div>
   );
 };
 
@@ -204,9 +243,50 @@ const ResultPage = () => {
 
   const { results } = analysis;
   const { damages, summary } = results;
+  const quality = results.quality;
+  const anomaly = results.anomaly;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
+      {/* Review Banner */}
+      {summary.needs_review && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3"
+          data-testid="review-banner"
+        >
+          <Eye className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-medium text-amber-800">Manuel Inceleme Onerilir</p>
+            <p className="text-sm text-amber-600 mt-1">
+              {summary.review_reasons?.join(' / ')}
+            </p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Quality Warning Banner */}
+      {quality && quality.warnings && quality.warnings.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3"
+          data-testid="quality-warning-banner"
+        >
+          <ImageOff className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-medium text-blue-800">Goruntu Kalite Uyarisi</p>
+            <ul className="text-sm text-blue-600 mt-1 space-y-0.5">
+              {quality.warnings.map((w, i) => (
+                <li key={i}>{w.message_tr}</li>
+              ))}
+            </ul>
+          </div>
+        </motion.div>
+      )}
+
       {/* Header */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
@@ -306,7 +386,7 @@ const ResultPage = () => {
         >
           {/* Summary Card */}
           <div className="bg-white rounded-2xl shadow-apple p-6">
-            <h2 className="text-lg font-semibold text-apple-text mb-4">Özet</h2>
+            <h2 className="text-lg font-semibold text-apple-text mb-4">Ozet</h2>
             
             <div className="space-y-4">
               <div className="flex items-center justify-between py-3 border-b border-apple-border">
@@ -315,25 +395,66 @@ const ResultPage = () => {
               </div>
               
               <div className="flex items-center justify-between py-3 border-b border-apple-border">
-                <span className="text-apple-secondary">Etkilenen Parça</span>
+                <span className="text-apple-secondary">Etkilenen Parca</span>
                 <span className="font-semibold text-apple-text text-xl">{summary.affected_parts}</span>
               </div>
               
               <div className="flex items-center justify-between py-3 border-b border-apple-border">
-                <span className="text-apple-secondary">Ortalama Şiddet</span>
+                <span className="text-apple-secondary">Ortalama Siddet</span>
                 <SeverityDots severity={Math.round(summary.average_severity)} />
               </div>
               
-              <div className="flex items-center justify-between py-3">
+              <div className="flex items-center justify-between py-3 border-b border-apple-border">
                 <span className="text-apple-secondary">Risk Seviyesi</span>
                 <RiskBadge level={summary.risk_level} />
               </div>
+
+              {quality && (
+                <div className="flex items-center justify-between py-3 border-b border-apple-border">
+                  <span className="text-apple-secondary">Goruntu Kalitesi</span>
+                  <QualityIndicator quality={quality} />
+                </div>
+              )}
+
+              {anomaly && anomaly.anomaly_score > 0 && (
+                <div className="flex items-center justify-between py-3" data-testid="anomaly-score">
+                  <span className="text-apple-secondary flex items-center gap-1.5">
+                    <ShieldAlert className="w-4 h-4" />
+                    Anomali Skoru
+                  </span>
+                  <span className={`font-semibold ${anomaly.anomaly_score >= 30 ? 'text-red-600' : 'text-green-600'}`}>
+                    {anomaly.anomaly_score}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
+          {/* Anomaly Signals */}
+          {anomaly && anomaly.signals && anomaly.signals.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-apple p-6" data-testid="anomaly-signals">
+              <h2 className="text-lg font-semibold text-apple-text mb-4 flex items-center gap-2">
+                <Shield className="w-5 h-5" />
+                Anomali Sinyalleri
+              </h2>
+              <div className="space-y-2">
+                {anomaly.signals.map((signal, i) => (
+                  <div key={i} className="p-3 bg-red-50 rounded-lg text-sm text-red-700">
+                    {signal.message_tr}
+                  </div>
+                ))}
+                {anomaly.action_tr && (
+                  <div className="p-3 bg-amber-50 rounded-lg text-sm text-amber-700 font-medium mt-2">
+                    Oneri: {anomaly.action_tr}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Damage List */}
           <div className="bg-white rounded-2xl shadow-apple p-6">
-            <h2 className="text-lg font-semibold text-apple-text mb-4">Hasar Detayları</h2>
+            <h2 className="text-lg font-semibold text-apple-text mb-4">Hasar Detaylari</h2>
             
             {damages.length > 0 ? (
               <div className="space-y-3">
@@ -344,6 +465,7 @@ const ResultPage = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 + index * 0.05 }}
                     className="p-4 bg-gray-50 rounded-xl"
+                    data-testid={`damage-card-${index}`}
                   >
                     <div className="flex items-start justify-between">
                       <div>
@@ -356,11 +478,30 @@ const ResultPage = () => {
                           </span>
                         </div>
                         <p className="text-sm text-apple-secondary">
-                          {damage.part_tr || 'Belirsiz parça'}
+                          {damage.part_tr || 'Belirsiz parca'}
                         </p>
                       </div>
                       <SeverityDots severity={damage.severity} />
                     </div>
+                    
+                    {/* Repair Recommendation */}
+                    {damage.repair && (
+                      <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between" data-testid={`repair-rec-${index}`}>
+                        <div className="flex items-center gap-1.5 text-sm text-apple-secondary">
+                          <Wrench className="w-3.5 h-3.5" />
+                          <span>Onarim Onerisi:</span>
+                        </div>
+                        <RepairBadge repairType={damage.repair.repair_type_tr} />
+                      </div>
+                    )}
+
+                    {/* Severity Details */}
+                    {damage.severity_details && (
+                      <div className="mt-2 flex items-center gap-3 text-xs text-apple-secondary">
+                        <span>Siddet: {damage.severity_details.label}</span>
+                        <span>Alan: %{damage.severity_details.area_ratio}</span>
+                      </div>
+                    )}
                   </motion.div>
                 ))}
               </div>
@@ -368,7 +509,7 @@ const ResultPage = () => {
               <div className="text-center py-8">
                 <CheckCircle className="w-12 h-12 mx-auto mb-3 text-apple-success" />
                 <p className="text-apple-text font-medium">Hasar tespit edilmedi</p>
-                <p className="text-sm text-apple-secondary">Aracınız iyi durumda görünüyor</p>
+                <p className="text-sm text-apple-secondary">Araciniz iyi durumda gorunuyor</p>
               </div>
             )}
           </div>

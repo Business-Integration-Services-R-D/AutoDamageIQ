@@ -33,6 +33,11 @@ os.environ['TORCH_FORCE_WEIGHTS_ONLY_LOAD'] = '0'
 
 from ultralytics import YOLO
 
+# Import new modules
+from image_quality import assess_image_quality
+from repair_engine import get_repair_recommendation
+from anomaly_detector import compute_phash, check_duplicate_image, generate_anomaly_score
+
 # Initialize FastAPI
 app = FastAPI(
     title="AutoDamageID API",
@@ -163,7 +168,7 @@ PARTS_TR = {
     "wheel": "Tekerlek"
 }
 
-# Severity mapping based on damage type
+# Severity mapping based on damage type (base weights)
 SEVERITY_MAP = {
     "crack": 3,
     "dent": 3,
@@ -172,6 +177,10 @@ SEVERITY_MAP = {
     "scratch": 2,
     "tire_flat": 4
 }
+
+# Manual review confidence threshold
+REVIEW_CONFIDENCE_THRESHOLD = 35.0
+REVIEW_RISK_THRESHOLD = "Yuksek"
 
 def convert_numpy_types(obj):
     """Convert numpy types to Python native types for JSON/MongoDB serialization"""
@@ -222,6 +231,55 @@ def box_iou(box_a, box_b):
     
     union = area_a + area_b - inter_area + 1e-6
     return float(inter_area / union)
+
+def calculate_enhanced_severity(damage_type: str, box: list, image_w: int, image_h: int, confidence: float) -> Dict[str, Any]:
+    """Cok degiskenli siddet skoru hesapla"""
+    base_severity = SEVERITY_MAP.get(damage_type, 3)
+    
+    # Alan orani hesapla (hasar kutusu / gorsel alani)
+    box_area = max(0, (box[2] - box[0]) * (box[3] - box[1]))
+    image_area = max(1, image_w * image_h)
+    area_ratio = box_area / image_area
+    
+    # Alan bazli siddet katkisi (buyuk hasar = daha ciddi)
+    if area_ratio > 0.15:
+        area_factor = 1.5
+    elif area_ratio > 0.08:
+        area_factor = 1.2
+    elif area_ratio > 0.03:
+        area_factor = 1.0
+    else:
+        area_factor = 0.8
+    
+    # Guven bazli ayarlama (dusuk guven = belirsizlik)
+    confidence_factor = 1.0 if confidence > 50 else 0.9
+    
+    # Birlesik skor
+    enhanced_score = base_severity * area_factor * confidence_factor
+    enhanced_score = round(min(5.0, max(1.0, enhanced_score)), 1)
+    
+    # Tam sayi siddet sinifi
+    severity_class = int(round(enhanced_score))
+    severity_class = max(1, min(5, severity_class))
+    
+    # Siddet etiketi
+    if enhanced_score >= 4.0:
+        severity_label = "Yuksek"
+    elif enhanced_score >= 2.5:
+        severity_label = "Orta"
+    else:
+        severity_label = "Dusuk"
+    
+    return {
+        "score": float(enhanced_score),
+        "class": severity_class,
+        "label": severity_label,
+        "area_ratio": float(round(area_ratio * 100, 2)),
+        "base_severity": base_severity,
+        "area_factor": float(area_factor),
+        "confidence_factor": float(confidence_factor)
+    }
+
 
 def analyze_image(image_np: np.ndarray) -> Dict[str, Any]:
     """Run damage detection and parts segmentation on image"""
@@ -275,17 +333,35 @@ def analyze_image(image_np: np.ndarray) -> Dict[str, Any]:
         damage_type = dmg_names[int(dmg_cls[i])]
         confidence = float(dmg_conf[i])
         
+        # Enhanced severity calculation
+        severity_info = calculate_enhanced_severity(
+            damage_type, 
+            [float(x) for x in dmg_box.tolist()], 
+            w, h, 
+            confidence * 100
+        )
+        
+        # Repair recommendation
+        repair_rec = get_repair_recommendation(
+            damage_type=damage_type,
+            severity=severity_info["class"],
+            confidence=confidence * 100,
+            panel=best_part if best_iou > 0.1 else None
+        )
+        
         damage_entry = {
             "id": str(uuid.uuid4())[:8],
             "type": damage_type,
             "type_tr": DAMAGE_TR.get(damage_type, damage_type),
             "confidence": float(round(confidence * 100, 1)),
-            "severity": int(SEVERITY_MAP.get(damage_type, 3)),
+            "severity": severity_info["class"],
+            "severity_details": severity_info,
             "box": [float(x) for x in dmg_box.tolist()],
             "part": best_part if best_iou > 0.1 else None,
             "part_tr": PARTS_TR.get(best_part, best_part) if best_iou > 0.1 else None,
             "part_box": best_part_box if best_iou > 0.1 else None,
-            "iou_with_part": float(round(best_iou, 3))
+            "iou_with_part": float(round(best_iou, 3)),
+            "repair": repair_rec
         }
         damages.append(damage_entry)
     
@@ -303,12 +379,28 @@ def analyze_image(image_np: np.ndarray) -> Dict[str, Any]:
     total_damages = len(damages)
     affected_parts = len(set([d["part"] for d in damages if d["part"]]))
     avg_severity = float(round(sum([d["severity"] for d in damages]) / max(1, total_damages), 1))
+    avg_confidence = float(round(sum([d["confidence"] for d in damages]) / max(1, total_damages), 1))
     
-    risk_level = "Düşük"
+    risk_level = "Dusuk"
     if avg_severity >= 4 or total_damages >= 4:
-        risk_level = "Yüksek"
+        risk_level = "Yuksek"
     elif avg_severity >= 2.5 or total_damages >= 2:
         risk_level = "Orta"
+    
+    # Manuel inceleme gerekli mi?
+    needs_review = (
+        avg_confidence < REVIEW_CONFIDENCE_THRESHOLD or
+        risk_level == "Yuksek" or
+        any(d["confidence"] < 20 for d in damages)
+    )
+    
+    review_reasons = []
+    if avg_confidence < REVIEW_CONFIDENCE_THRESHOLD:
+        review_reasons.append("Dusuk ortalama guven skoru")
+    if risk_level == "Yuksek":
+        review_reasons.append("Yuksek risk seviyesi")
+    if any(d["confidence"] < 20 for d in damages):
+        review_reasons.append("Cok dusuk guvenli hasar tespiti mevcut")
     
     result = {
         "damages": damages,
@@ -317,7 +409,10 @@ def analyze_image(image_np: np.ndarray) -> Dict[str, Any]:
             "total_damages": int(total_damages),
             "affected_parts": int(affected_parts),
             "average_severity": float(avg_severity),
-            "risk_level": risk_level
+            "average_confidence": float(avg_confidence),
+            "risk_level": risk_level,
+            "needs_review": bool(needs_review),
+            "review_reasons": review_reasons
         },
         "image_size": {"width": int(w), "height": int(h)}
     }
@@ -348,7 +443,7 @@ async def analyze_vehicle(file: UploadFile = File(...)):
     
     # Validate file type
     if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Sadece resim dosyaları kabul edilir")
+        raise HTTPException(status_code=400, detail="Sadece resim dosyalari kabul edilir")
     
     # Read image
     contents = await file.read()
@@ -358,13 +453,41 @@ async def analyze_vehicle(file: UploadFile = File(...)):
     image_np = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     
     if image_np is None:
-        raise HTTPException(status_code=400, detail="Resim okunamadı")
+        raise HTTPException(status_code=400, detail="Resim okunamadi")
     
-    # Analyze
+    # Step 1: Image quality assessment
+    quality_result = assess_image_quality(image_np)
+    
+    # Step 2: Compute perceptual hash
+    phash = compute_phash(image_np)
+    
+    # Step 3: Check for duplicate images
+    duplicate_result = check_duplicate_image(image_np, phash, db)
+    
+    # Step 4: Generate anomaly score
+    anomaly_result = generate_anomaly_score(image_np, duplicate_result, quality_result)
+    
+    # Step 5: Run damage analysis (even if quality is low, but add warning)
     results = analyze_image(image_np)
     
     # Ensure all numpy types are converted to native Python types
     results = convert_to_native_types(results)
+    
+    # Add quality, anomaly and review data to results
+    results["quality"] = quality_result
+    results["anomaly"] = anomaly_result
+    
+    # Update review status based on quality and anomaly
+    if quality_result.get("warnings"):
+        if not results["summary"]["needs_review"]:
+            high_quality_warnings = [w for w in quality_result["warnings"] if w["severity"] == "high"]
+            if high_quality_warnings:
+                results["summary"]["needs_review"] = True
+                results["summary"]["review_reasons"].append("Dusuk goruntu kalitesi")
+    
+    if anomaly_result.get("anomaly_score", 0) >= 30:
+        results["summary"]["needs_review"] = True
+        results["summary"]["review_reasons"].append("Anomali sinyali tespit edildi")
     
     # Convert image to base64 for storage/display
     _, buffer = cv2.imencode('.jpg', image_np, [cv2.IMWRITE_JPEG_QUALITY, 85])
@@ -388,7 +511,9 @@ async def analyze_vehicle(file: UploadFile = File(...)):
         "image_base64": image_base64,
         "thumbnail": thumbnail_base64,
         "results": results,
-        "filename": file.filename
+        "filename": file.filename,
+        "phash": phash,
+        "needs_review": results["summary"]["needs_review"]
     }
     
     # Save to MongoDB
@@ -439,9 +564,62 @@ async def delete_analysis(analysis_id: str):
     result = analyses_collection.delete_one({"_id": analysis_id})
     
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Analiz bulunamadı")
+        raise HTTPException(status_code=404, detail="Analiz bulunamadi")
     
     return {"message": "Analiz silindi"}
+
+@app.get("/api/review-queue")
+async def get_review_queue(limit: int = 50):
+    """Manuel inceleme gerektiren analizleri listele"""
+    analyses = list(
+        analyses_collection.find(
+            {"needs_review": True},
+            {"image_base64": 0}
+        ).sort("created_at", -1).limit(limit)
+    )
+    
+    return [
+        {
+            "id": str(a["_id"]),
+            "created_at": a["created_at"],
+            "thumbnail": a.get("thumbnail", ""),
+            "summary": a["results"]["summary"],
+            "quality": a["results"].get("quality", {}),
+            "anomaly": a["results"].get("anomaly", {}),
+            "filename": a.get("filename", "Bilinmeyen"),
+            "review_reasons": a["results"]["summary"].get("review_reasons", [])
+        }
+        for a in analyses
+    ]
+
+@app.post("/api/analyses/{analysis_id}/review")
+async def mark_reviewed(analysis_id: str):
+    """Analizi incelendi olarak isaretle"""
+    result = analyses_collection.update_one(
+        {"_id": analysis_id},
+        {"$set": {"needs_review": False, "reviewed_at": datetime.utcnow().isoformat()}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Analiz bulunamadi")
+    
+    return {"message": "Analiz incelendi olarak isaretlendi"}
+
+@app.post("/api/quality-check")
+async def quality_check(file: UploadFile = File(...)):
+    """Goruntu kalite kontrolu yap (analiz yapmadan)"""
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Sadece resim dosyalari kabul edilir")
+    
+    contents = await file.read()
+    nparr = np.frombuffer(contents, np.uint8)
+    image_np = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    
+    if image_np is None:
+        raise HTTPException(status_code=400, detail="Resim okunamadi")
+    
+    quality_result = assess_image_quality(image_np)
+    return quality_result
 
 @app.get("/api/analyses/{analysis_id}/pdf")
 async def download_pdf(analysis_id: str):
