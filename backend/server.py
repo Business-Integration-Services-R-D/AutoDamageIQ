@@ -90,47 +90,39 @@ def get_active_damage_model_path():
 
 def get_active_parts_model_path():
     """Aktif parça segmentasyonu modelinin yolunu al"""
-    # Önce custom eğitilmiş modeli kontrol et
     if CUSTOM_PARTS_MODEL_PATH.exists():
         return CUSTOM_PARTS_MODEL_PATH
     return DEFAULT_PARTS_MODEL_PATH
 
+def _load_yolo_model(model_path):
+    """Safely load a YOLO model with weights_only=False patch"""
+    original_load = torch.load
+    def patched_load(*args, **kwargs):
+        kwargs['weights_only'] = False
+        return original_load(*args, **kwargs)
+    torch.load = patched_load
+    try:
+        model = YOLO(str(model_path))
+    finally:
+        torch.load = original_load
+    return model
+
 def get_damage_model():
     global damage_model, damage_model_path
     active_path = get_active_damage_model_path()
-    
-    # Reload if model changed
     if damage_model is None or damage_model_path != str(active_path):
         print(f"Loading damage model from {active_path}")
-        # Use weights_only=False for YOLO custom models
-        import torch
-        original_load = torch.load
-        def patched_load(*args, **kwargs):
-            kwargs['weights_only'] = False
-            return original_load(*args, **kwargs)
-        torch.load = patched_load
-        damage_model = YOLO(str(active_path))
+        damage_model = _load_yolo_model(active_path)
         damage_model_path = str(active_path)
-        torch.load = original_load
     return damage_model
 
 def get_parts_model():
     global parts_model, parts_model_path
     active_path = get_active_parts_model_path()
-    
-    # Reload if model changed
     if parts_model is None or parts_model_path != str(active_path):
         print(f"Loading parts model from {active_path}")
-        # Use weights_only=False for YOLO custom models
-        import torch
-        original_load = torch.load
-        def patched_load(*args, **kwargs):
-            kwargs['weights_only'] = False
-            return original_load(*args, **kwargs)
-        torch.load = patched_load
-        parts_model = YOLO(str(active_path))
+        parts_model = _load_yolo_model(active_path)
         parts_model_path = str(active_path)
-        torch.load = original_load
     return parts_model
 
 # Damage type translations

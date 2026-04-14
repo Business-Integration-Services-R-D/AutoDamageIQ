@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, Upload, Loader2, AlertTriangle, CheckCircle, Shield, ChevronDown } from 'lucide-react';
+import { ArrowLeftRight, Upload, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
 const ComparePage = () => {
-  const [mode, setMode] = useState('upload'); // 'upload' or 'select'
+  const [mode, setMode] = useState('upload');
   const [beforeFile, setBeforeFile] = useState(null);
   const [afterFile, setAfterFile] = useState(null);
   const [beforePreview, setBeforePreview] = useState(null);
@@ -18,20 +18,20 @@ const ComparePage = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
+  const fetchAnalyses = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/analyses?limit=50`);
+      setAnalyses(res.data);
+    } catch (_err) {
+      // silent
+    }
+  }, []);
+
   useEffect(() => {
     if (mode === 'select') {
       fetchAnalyses();
     }
-  }, [mode]);
-
-  const fetchAnalyses = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/api/analyses?limit=50`);
-      setAnalyses(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  }, [mode, fetchAnalyses]);
 
   const handleFileSelect = (type, file) => {
     if (!file) return;

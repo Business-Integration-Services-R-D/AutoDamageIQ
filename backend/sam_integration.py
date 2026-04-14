@@ -233,8 +233,6 @@ def _estimate_via_bbox_ratio(
     BBox boyutu + hasar tipi faktoru ile goresel olcum.
     Panel bilgisi yoksa kullanilir.
     """
-    fill = mask_data["fill_ratio"]
-
     # BBox'un gorsel icindeki orani
     bbox_w = max(1, damage_box[2] - damage_box[0])
     bbox_h = max(1, damage_box[3] - damage_box[1])

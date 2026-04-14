@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Download, Loader2, AlertTriangle, CheckCircle, XCircle, Shield, ShieldAlert, Wrench, Eye, ImageOff } from 'lucide-react';
@@ -85,29 +85,18 @@ const ResultPage = () => {
   const imageRef = useRef(null);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  useEffect(() => {
-    fetchAnalysis();
-  }, [id]);
-
-  useEffect(() => {
-    if (analysis && imageLoaded) {
-      drawAnnotations();
-    }
-  }, [analysis, imageLoaded]);
-
-  const fetchAnalysis = async () => {
+  const fetchAnalysis = useCallback(async () => {
     try {
       const response = await axios.get(`${API_URL}/api/analyses/${id}`);
       setAnalysis(response.data);
-    } catch (err) {
-      console.error('Fetch error:', err);
-      setError('Analiz yüklenemedi');
+    } catch (_err) {
+      setError('Analiz yuklenemedi');
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const drawAnnotations = () => {
+  const drawAnnotations = useCallback(() => {
     const canvas = canvasRef.current;
     const image = imageRef.current;
     if (!canvas || !image || !analysis) return;
@@ -190,7 +179,17 @@ const ResultPage = () => {
       ctx.arc(isLeftSide ? boxX : boxX + boxW, centerY, 4, 0, Math.PI * 2);
       ctx.fill();
     });
-  };
+  }, [analysis]);
+
+  useEffect(() => {
+    fetchAnalysis();
+  }, [fetchAnalysis]);
+
+  useEffect(() => {
+    if (analysis && imageLoaded) {
+      drawAnnotations();
+    }
+  }, [analysis, imageLoaded, drawAnnotations]);
 
   const handleDownloadPDF = async () => {
     setDownloading(true);
@@ -198,7 +197,6 @@ const ResultPage = () => {
       const response = await axios.get(`${API_URL}/api/analyses/${id}/pdf`, {
         responseType: 'blob'
       });
-      
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -207,8 +205,7 @@ const ResultPage = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Download error:', err);
+    } catch (_err) {
       alert('PDF indirilemedi');
     } finally {
       setDownloading(false);
