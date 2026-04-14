@@ -494,11 +494,32 @@ const ResultPage = () => {
                       </div>
                     )}
 
-                    {/* Severity Details */}
-                    {damage.severity_details && (
-                      <div className="mt-2 flex items-center gap-3 text-xs text-apple-secondary">
-                        <span>Siddet: {damage.severity_details.label}</span>
-                        <span>Alan: %{damage.severity_details.area_ratio}</span>
+                    {/* Severity Details + SAM Measurements */}
+                    {(damage.severity_details || damage.sam_data?.available) && (
+                      <div className="mt-2 space-y-1 text-xs text-apple-secondary" data-testid={`measurements-${index}`}>
+                        {damage.severity_details && (
+                          <div className="flex items-center gap-3">
+                            <span>Siddet: {damage.severity_details.label}</span>
+                            <span>Alan: %{damage.severity_details.area_ratio}</span>
+                          </div>
+                        )}
+                        {damage.sam_data?.available && damage.sam_data.measurements && (
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded">
+                              SAM: {damage.sam_data.measurements.size_band}
+                            </span>
+                            {damage.sam_data.measurements.has_panel_calibration && damage.sam_data.measurements.primary && (
+                              <>
+                                <span>{damage.sam_data.measurements.primary.bbox_width_cm}x{damage.sam_data.measurements.primary.bbox_height_cm} cm</span>
+                                <span>~{damage.sam_data.measurements.primary.damage_area_cm2} cm2</span>
+                              </>
+                            )}
+                            {!damage.sam_data.measurements.has_panel_calibration && damage.sam_data.measurements.bbox_analysis && (
+                              <span>{damage.sam_data.measurements.bbox_analysis.relative_size}</span>
+                            )}
+                            <span>Doluluk: %{Math.round((damage.sam_data.measurements.fill_ratio || 0) * 100)}</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </motion.div>
