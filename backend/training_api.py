@@ -261,8 +261,8 @@ def create_runpod_pod(config: TrainingConfig) -> Dict[str, Any]:
     job_id = f"train_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
     
     # URLs
-    dataset_url = "https://cardamage-ai-1.preview.emergentagent.com/api/training/download-dataset"
-    script_url = "https://cardamage-ai-1.preview.emergentagent.com/api/training/download-script"
+    dataset_url = "https://damage-vision.preview.emergentagent.com/api/training/download-dataset"
+    script_url = "https://damage-vision.preview.emergentagent.com/api/training/download-script"
     
     # Startup komutu - bash -c ile script'i indir ve çalıştır, sonra container'ı canlı tut
     startup_cmd = f'bash -c "wget -qO /workspace/train.sh {script_url} && chmod +x /workspace/train.sh && /workspace/train.sh 2>&1 | tee /workspace/training.log; tail -f /dev/null"'

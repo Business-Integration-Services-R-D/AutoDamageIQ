@@ -11,7 +11,7 @@ echo "========================================"
 cd /workspace
 
 echo "[1/4] Downloading dataset..."
-wget -q "https://cardamage-ai-1.preview.emergentagent.com/api/training/download-dataset" -O dataset.tar.gz
+wget -q "https://damage-vision.preview.emergentagent.com/api/training/download-dataset" -O dataset.tar.gz
 if [ $? -ne 0 ]; then
     echo "ERROR: Dataset download failed!"
     exit 1
