@@ -1,16 +1,10 @@
 {
   "id": "autodamage_best",
-  "name": "AutoDamage v1 (Custom Trained)",
+  "name": "\u00d6zel Model - autodamage_best",
   "path": "/app/models/autodamage_best.pt",
   "type": "custom",
-  "created_at": "2025-12-27T18:26:00",
-  "description": "RunPod'da eğitilmiş özel araç hasar tespit modeli - 50 epoch, 6 sınıf",
-  "metrics": {
-    "mAP50": 0.357,
-    "mAP50-95": 0.302,
-    "precision": 0.291,
-    "recall": 0.461
-  },
-  "classes": ["crack", "dent", "glass_shatter", "lamp_broken", "scratch", "tire_flat"],
-  "is_active": true
+  "created_at": "2026-02-09T14:35:33.640616",
+  "description": "Y\u00fcklenmi\u015f \u00f6zel model",
+  "metrics": null,
+  "is_active": false
 }
