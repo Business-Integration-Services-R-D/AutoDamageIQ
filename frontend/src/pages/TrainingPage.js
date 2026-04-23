@@ -37,8 +37,8 @@ const TrainingPage = () => {
 
   // Training state
   const [trainingConfig, setTrainingConfig] = useState({
-    model_size: 'l',
-    epochs: 50,
+    model_size: 'm',
+    epochs: 200,
     batch_size: 16,
     image_size: 640,
     include_custom: true

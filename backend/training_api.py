@@ -54,11 +54,13 @@ class AnnotationRequest(BaseModel):
     source: str = "user"  # user, correction, auto
 
 class TrainingConfig(BaseModel):
-    model_size: str = "l"  # n, s, m, l, x
-    epochs: int = 50
+    model_size: str = "m"  # n, s, m, l, x (v8 default: m)
+    epochs: int = 200
     batch_size: int = 16
     image_size: int = 640
     include_custom: bool = True
+    optimizer: str = "AdamW"
+    patience: int = 25
 
 class TrainingJob(BaseModel):
     job_id: str
