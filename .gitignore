@@ -26,7 +26,8 @@ yarn-error.log
 
 # Large files & datasets
 datasets/
-models/*.pt
+models/
+*.pt
 *.tar.gz
 *.zip
 *.h5
@@ -34,9 +35,13 @@ models/*.pt
 
 # Training outputs
 training/jobs/
+training/dataset.tar.gz
+runs/
 src/yolo/runs/
+src/yolo/weights/
 src/autodamageid/data/carparts_seg/images/
 src/autodamageid/data/carparts_seg/labels/
+src/autodamageid/data/damage_yolo/
 *.cache
 
 # Logs
