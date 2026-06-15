@@ -16,8 +16,14 @@ DATASET_DL_URL="${DATASET_URL:-https://damage-vision.preview.emergentagent.com/a
 echo "Dataset URL: $DATASET_DL_URL"
 
 echo "[1/4] Downloading dataset..."
-wget -q --timeout=300 "$DATASET_DL_URL" -O dataset.tar.gz
+# curl ile retry + resume desteği
+curl -L --retry 5 --retry-delay 10 -C - --max-time 600 -o dataset.tar.gz "$DATASET_DL_URL"
 if [ $? -ne 0 ] || [ ! -s dataset.tar.gz ]; then
+    echo "First attempt failed, retrying..."
+    rm -f dataset.tar.gz
+    curl -L --retry 3 --retry-delay 5 --max-time 900 -o dataset.tar.gz "$DATASET_DL_URL"
+fi
+if [ ! -s dataset.tar.gz ]; then
     echo "ERROR: Dataset download failed!"
     exit 1
 fi
