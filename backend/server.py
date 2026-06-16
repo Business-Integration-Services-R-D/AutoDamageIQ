@@ -288,7 +288,7 @@ def analyze_image(image_np: np.ndarray, enable_sam: bool = True) -> Dict[str, An
     damage_results = damage_mod.predict(
         source=image_np,
         imgsz=640,
-        conf=0.20,
+        conf=0.15,
         verbose=False
     )[0]
     
