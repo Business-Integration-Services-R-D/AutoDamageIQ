@@ -49,6 +49,7 @@ from image_quality import assess_image_quality
 from repair_engine import get_repair_recommendation
 from anomaly_detector import compute_phash, check_duplicate_image, generate_anomaly_score
 from before_after import compare_analyses
+from runpod_inference import is_runpod_available, get_runpod_status, run_inference_async
 
 # Conditional SAM import
 try:
@@ -445,6 +446,7 @@ class AnalysisListItem(BaseModel):
 async def health_check():
     damage_path = get_active_damage_model_path()
     parts_path = get_active_parts_model_path()
+    runpod_ok = is_runpod_available()
     return {
         "status": "healthy",
         "service": "AutoDamageID",
@@ -453,7 +455,9 @@ async def health_check():
         "damage_model": str(damage_path) if damage_path else None,
         "parts_model": str(parts_path) if parts_path else None,
         "sam_available": is_sam_available(),
-        "vlm_available": bool(os.environ.get("EMERGENT_LLM_KEY"))
+        "vlm_available": bool(os.environ.get("EMERGENT_LLM_KEY")),
+        "runpod_serverless": runpod_ok,
+        "inference_mode": "local" if (_ml_available and damage_path) else ("runpod" if runpod_ok else "unavailable")
     }
 
 @app.post("/api/analyze", response_model=AnalysisResponse)
@@ -486,8 +490,26 @@ async def analyze_vehicle(file: UploadFile = File(...)):
     # Step 4: Generate anomaly score
     anomaly_result = generate_anomaly_score(image_np, duplicate_result, quality_result)
     
-    # Step 5: Run damage analysis (even if quality is low, but add warning)
-    results = analyze_image(image_np)
+    # Step 5: Run damage analysis
+    # Öncelik: Lokal model > RunPod Serverless
+    use_runpod = False
+    if get_damage_model() is not None:
+        # Lokal model mevcut
+        results = analyze_image(image_np)
+    elif is_runpod_available():
+        # RunPod serverless kullan
+        use_runpod = True
+        _, enc_buffer = cv2.imencode('.jpg', image_np, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        img_b64_for_runpod = base64.b64encode(enc_buffer).decode('utf-8')
+        try:
+            results = await run_inference_async(img_b64_for_runpod, timeout=90)
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"Inference hatasi: {str(e)}")
+    else:
+        raise HTTPException(
+            status_code=503,
+            detail="Hasar tespit modeli mevcut degil. Lokal model veya RunPod Serverless yapilandirilmali."
+        )
     
     # Step 6: VLM Fallback - belirsiz parça eşleşmeleri için GPT-4o
     try:
@@ -669,6 +691,12 @@ async def quality_check(file: UploadFile = File(...)):
 async def sam_status():
     """SAM model durumunu dondur"""
     return get_sam_status()
+
+@app.get("/api/runpod/status")
+async def runpod_endpoint_status():
+    """RunPod serverless endpoint durumu"""
+    return get_runpod_status()
+
 
 # =============================================================================
 # BEFORE/AFTER KARSILASTIRMA ENDPOINT'LERI
