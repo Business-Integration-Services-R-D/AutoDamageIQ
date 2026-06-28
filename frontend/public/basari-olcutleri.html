@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Başarı Ölçütleri</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            background: #FFFFFF;
+            padding: 48px 56px;
+            min-height: 100vh;
+        }
+        h1 {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 6px;
+            letter-spacing: -0.5px;
+        }
+        .underline {
+            width: 260px;
+            height: 4px;
+            background: #c0392b;
+            border-radius: 2px;
+            margin-bottom: 32px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        thead th {
+            background: #f0f0f0;
+            color: #1a1a1a;
+            font-weight: 700;
+            padding: 14px 16px;
+            text-align: center;
+            border: 1.5px solid #cccccc;
+            font-size: 16px;
+        }
+        thead th:first-child {
+            width: 40px;
+        }
+        thead th:nth-child(2) {
+            width: 195px;
+        }
+        thead th:nth-child(3) {
+            width: 260px;
+        }
+        thead th:nth-child(4) {
+            width: 195px;
+        }
+        thead th:nth-child(5) {
+            width: 290px;
+        }
+        tbody td {
+            padding: 14px 16px;
+            border: 1.5px solid #cccccc;
+            color: #2c2c2c;
+            vertical-align: middle;
+            text-align: center;
+        }
+        tbody td:first-child {
+            font-weight: 700;
+            font-size: 17px;
+            color: #1a1a1a;
+        }
+        tbody tr:nth-child(even) {
+            background: #fafafa;
+        }
+        tbody tr:nth-child(odd) {
+            background: #ffffff;
+        }
+        .status-progress {
+            color: #e67e22;
+            font-weight: 600;
+        }
+        .status-active {
+            color: #27ae60;
+            font-weight: 600;
+        }
+        .status-metric {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        .footer {
+            margin-top: 24px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0.35;
+        }
+        .footer span {
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>Başarı Ölçütleri</h1>
+    <div class="underline"></div>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Başarı Ölçütü</th>
+                <th>Tanım</th>
+                <th>Hedeflenen Değer</th>
+                <th>Mevcut Sonuç</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>Dış yüzey hasar tespiti ve bölütleme başarımı</td>
+                <td>Hasar var/yok kararı, hasar bölgesinin doğru bulunması ve işaretlenmesi</td>
+                <td>Hasar tespit F1 skoru ≥ %90</td>
+                <td class="status-metric">mAP@50: %50.3<br>Precision: %60.9<br>Recall: %49.3<br><span style="font-weight:400;font-size:13px;color:#888">(YOLOv8m, birleşik veri seti)</span></td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>Panel/konum eşleme doğruluğu</td>
+                <td>Hasarın doğru panel/parça ile eşleştirilmesi</td>
+                <td>Panel eşleme doğruluğu ≥ %92</td>
+                <td class="status-progress">İyileştirme devam ediyor<br><span style="font-weight:400;font-size:13px;color:#888">(VLM fallback planlanıyor)</span></td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td>Şiddet ve ölçü tahmini güvenilirliği</td>
+                <td>Hasarın şiddet sınıfı ve boyut bilgisinin güvenilir üretilmesi</td>
+                <td>Şiddet sınıflama F1 skoru ≥ %85, ölçü tahmin hatası ≤ %10</td>
+                <td class="status-active">Kural tabanlı + SAM alan hesaplaması aktif</td>
+            </tr>
+            <tr>
+                <td>4</td>
+                <td>Before/after yeni hasar doğrulama başarımı</td>
+                <td>Yeni hasarın kanıta dayalı tespiti ve raporlanması</td>
+                <td>Yeni hasar tespit F1 skoru ≥ %88</td>
+                <td class="status-progress">Prototip çalışıyor<br><span style="font-weight:400;font-size:13px;color:#888">(Kantitatif değerlendirme planlanıyor)</span></td>
+            </tr>
+            <tr>
+                <td>5</td>
+                <td>Onarım tipi önerisi tutarlılığı</td>
+                <td>Önerilen onarım tipinin uzman kararıyla uyumu</td>
+                <td>Uzman uyumu ≥ %80</td>
+                <td class="status-progress">Kural tabanlı motor aktif<br><span style="font-weight:400;font-size:13px;color:#888">(Uzman validasyonu bekliyor)</span></td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>

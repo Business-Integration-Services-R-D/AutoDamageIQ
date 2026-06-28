@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoDamageIQ Sistem Görseli</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #FFFFFF;
+            padding: 40px 48px;
+            color: #1a1a2e;
+            min-width: 1400px;
+        }
+
+        /* ===== TITLE ===== */
+        .title {
+            text-align: center;
+            margin-bottom: 44px;
+        }
+        .title h1 {
+            font-size: 32px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.8px;
+        }
+        .title-bar {
+            width: 80px;
+            height: 3px;
+            background: linear-gradient(90deg, #0ea5e9, #6366f1);
+            margin: 10px auto 0;
+            border-radius: 2px;
+        }
+
+        /* ===== TOP PIPELINE ===== */
+        .pipeline {
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+            gap: 0;
+            margin-bottom: 48px;
+        }
+        .pipe-step {
+            flex: 1;
+            max-width: 220px;
+            min-height: 170px;
+            border-radius: 12px;
+            padding: 20px 18px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .pipe-step .step-num {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-bottom: 6px;
+        }
+        .pipe-step .step-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            line-height: 1.2;
+        }
+        .pipe-step .step-items {
+            list-style: none;
+            font-size: 12.5px;
+            line-height: 1.7;
+            color: #475569;
+        }
+        .pipe-step .step-items li::before {
+            content: '';
+            display: inline-block;
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        /* Step colors */
+        .step-1 { background: #f0f9ff; border: 1.5px solid #bae6fd; }
+        .step-1 .step-num { color: #0284c7; }
+        .step-1 .step-title { color: #0c4a6e; }
+        .step-1 .step-items li::before { background: #38bdf8; }
+
+        .step-2 { background: #f0fdf4; border: 1.5px solid #bbf7d0; }
+        .step-2 .step-num { color: #16a34a; }
+        .step-2 .step-title { color: #14532d; }
+        .step-2 .step-items li::before { background: #4ade80; }
+
+        .step-3 { background: #faf5ff; border: 1.5px solid #e9d5ff; }
+        .step-3 .step-num { color: #7c3aed; }
+        .step-3 .step-title { color: #3b0764; }
+        .step-3 .step-items li::before { background: #a78bfa; }
+
+        .step-4 { background: #fffbeb; border: 1.5px solid #fde68a; }
+        .step-4 .step-num { color: #d97706; }
+        .step-4 .step-title { color: #78350f; }
+        .step-4 .step-items li::before { background: #fbbf24; }
+
+        .step-5 { background: #f0f9ff; border: 1.5px solid #bae6fd; }
+        .step-5 .step-num { color: #0284c7; }
+        .step-5 .step-title { color: #0c4a6e; }
+        .step-5 .step-items li::before { background: #38bdf8; }
+
+        /* Arrows between steps */
+        .pipe-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            flex-shrink: 0;
+        }
+        .pipe-arrow svg {
+            width: 32px;
+            height: 32px;
+            color: #94a3b8;
+        }
+
+        /* ===== BOTTOM SECTION ===== */
+        .bottom-section {
+            display: grid;
+            grid-template-columns: 260px 1fr 280px;
+            gap: 36px;
+            align-items: start;
+        }
+
+        /* ===== LEFT: VERTICAL FLOW ===== */
+        .vertical-flow {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+        }
+        .vf-box {
+            width: 240px;
+            border-radius: 10px;
+            padding: 16px 14px;
+            text-align: center;
+        }
+        .vf-box .vf-title {
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            line-height: 1.3;
+        }
+        .vf-box .vf-desc {
+            font-size: 11px;
+            color: #64748b;
+            line-height: 1.5;
+        }
+        .vf-arrow {
+            width: 2px;
+            height: 20px;
+            background: #cbd5e1;
+            position: relative;
+        }
+        .vf-arrow::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 6px solid #cbd5e1;
+        }
+
+        .vf-quality { background: #f0f9ff; border: 1.5px solid #bae6fd; }
+        .vf-quality .vf-title { color: #0369a1; }
+
+        .vf-detect { background: #ecfdf5; border: 1.5px solid #a7f3d0; }
+        .vf-detect .vf-title { color: #047857; }
+
+        .vf-panel { background: #fffbeb; border: 1.5px solid #fde68a; }
+        .vf-panel .vf-title { color: #b45309; }
+
+        .vf-severity { background: #fff7ed; border: 1.5px solid #fed7aa; }
+        .vf-severity .vf-title { color: #c2410c; }
+
+        /* ===== CENTER: LEGEND ===== */
+        .legend {
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 24px 28px;
+        }
+        .legend h3 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 18px;
+            padding-bottom: 10px;
+            border-bottom: 1.5px solid #e2e8f0;
+        }
+        .legend-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .legend-item:last-child { margin-bottom: 0; }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+        .legend-text {
+            font-size: 12.5px;
+            color: #475569;
+            line-height: 1.6;
+        }
+        .dot-blue { background: #3b82f6; }
+        .dot-green { background: #10b981; }
+        .dot-amber { background: #f59e0b; }
+        .dot-red { background: #ef4444; }
+
+        /* ===== RIGHT: CONTINUOUS IMPROVEMENT ===== */
+        .improvement {
+            border-radius: 12px;
+            padding: 24px 22px;
+            background: #faf5ff;
+            border: 1.5px solid #e9d5ff;
+        }
+        .improvement h3 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #6d28d9;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .improvement h3 .imp-num {
+            background: #7c3aed;
+            color: white;
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 800;
+        }
+        .imp-flow {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+        .imp-step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+        }
+        .imp-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            flex-shrink: 0;
+            background: #ede9fe;
+            color: #7c3aed;
+            font-weight: 700;
+        }
+        .imp-label {
+            font-size: 12.5px;
+            color: #4c1d95;
+            font-weight: 500;
+        }
+        .imp-connector {
+            width: 2px;
+            height: 10px;
+            background: #c4b5fd;
+            margin-left: 13px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TITLE -->
+    <div class="title">
+        <h1>AutoDamageIQ &mdash; Sistem Mimarisi</h1>
+        <div class="title-bar"></div>
+    </div>
+
+    <!-- TOP: 5-STEP PIPELINE -->
+    <div class="pipeline">
+        <!-- Step 1 -->
+        <div class="pipe-step step-1">
+            <span class="step-num">Adım 01</span>
+            <span class="step-title">Girdi</span>
+            <ul class="step-items">
+                <li>Teslim alma</li>
+                <li>Teslim etme</li>
+                <li>Filo kontrol</li>
+                <li>İç denetim</li>
+            </ul>
+        </div>
+
+        <div class="pipe-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="pipe-step step-2">
+            <span class="step-num">Adım 02</span>
+            <span class="step-title">Ön İşleme</span>
+            <ul class="step-items">
+                <li>Kalite kontrol</li>
+                <li>Görüntü normalizasyonu</li>
+                <li>Oturum eşleme</li>
+            </ul>
+        </div>
+
+        <div class="pipe-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="pipe-step step-3">
+            <span class="step-num">Adım 03</span>
+            <span class="step-title">Analiz Motoru</span>
+            <ul class="step-items">
+                <li>Hasar tespiti</li>
+                <li>Panel eşleme</li>
+                <li>Şiddet / ölçü</li>
+                <li>Onarım önerisi</li>
+            </ul>
+        </div>
+
+        <div class="pipe-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="pipe-step step-4">
+            <span class="step-num">Adım 04</span>
+            <span class="step-title">Karar Katmanı</span>
+            <ul class="step-items">
+                <li>Before / after</li>
+                <li>Yeni hasar</li>
+                <li>Anomali skoru</li>
+                <li>Güven skoru</li>
+            </ul>
+        </div>
+
+        <div class="pipe-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="pipe-step step-5">
+            <span class="step-num">Adım 05</span>
+            <span class="step-title">Çıktı</span>
+            <ul class="step-items">
+                <li>JSON rapor</li>
+                <li>Kanıt görseli</li>
+                <li>API aktarımı</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- BOTTOM 3-COL -->
+    <div class="bottom-section">
+
+        <!-- LEFT: Vertical flow -->
+        <div class="vertical-flow">
+            <div class="vf-box vf-quality">
+                <div class="vf-title">Kalite Farkındalığı</div>
+                <div class="vf-desc">Bulanıklık, düşük ışık, yansıma ve yeniden çekim ihtiyacı</div>
+            </div>
+            <div class="vf-arrow"></div>
+            <div class="vf-box vf-detect">
+                <div class="vf-title">Hasar Tespiti ve Bölütleme</div>
+                <div class="vf-desc">Çizik, göçük, çatlak, sürtme ve kırık alanların bulunması</div>
+            </div>
+            <div class="vf-arrow"></div>
+            <div class="vf-box vf-panel">
+                <div class="vf-title">Panel / Konum Eşleme</div>
+                <div class="vf-desc">Kapı, tampon, çamurluk, kaput ve alt bölge ilişkilendirmesi</div>
+            </div>
+            <div class="vf-arrow"></div>
+            <div class="vf-box vf-severity">
+                <div class="vf-title">Şiddet, Ölçü ve Onarım Önerisi</div>
+                <div class="vf-desc">Boyut, risk seviyesi ve önerilen işçilik kararının türetilmesi</div>
+            </div>
+        </div>
+
+        <!-- CENTER: Legend -->
+        <div class="legend">
+            <h3>Katmanlar Arası Veri Bağı</h3>
+
+            <div class="legend-item">
+                <div class="legend-dot dot-blue"></div>
+                <div class="legend-text">Kalite kontrol çıktısı, analizin güvenle yürütülüp yürütülmeyeceğini belirler.</div>
+            </div>
+
+            <div class="legend-item">
+                <div class="legend-dot dot-green"></div>
+                <div class="legend-text">Hasar tespiti çıktısı, panel eşleme ve şiddet/ölçü tahmini için temel girdidir.</div>
+            </div>
+
+            <div class="legend-item">
+                <div class="legend-dot dot-amber"></div>
+                <div class="legend-text">Panel eşleme, onarım önerisi ve maliyet akışına doğru parça bilgisini sağlar.</div>
+            </div>
+
+            <div class="legend-item">
+                <div class="legend-dot dot-red"></div>
+                <div class="legend-text">Her modül kendi güven skorunu üretir: düşük güvenli vakalar manuel incelemeye devredilir.</div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Continuous Improvement -->
+        <div class="improvement">
+            <h3>
+                <span class="imp-num">6</span>
+                Sürekli İyileştirme
+            </h3>
+            <div class="imp-flow">
+                <div class="imp-step">
+                    <div class="imp-icon">1</div>
+                    <div class="imp-label">Kullanıcı düzeltmeleri</div>
+                </div>
+                <div class="imp-connector"></div>
+                <div class="imp-step">
+                    <div class="imp-icon">2</div>
+                    <div class="imp-label">Etiketleme aracı</div>
+                </div>
+                <div class="imp-connector"></div>
+                <div class="imp-step">
+                    <div class="imp-icon">3</div>
+                    <div class="imp-label">Birleşik veri seti</div>
+                </div>
+                <div class="imp-connector"></div>
+                <div class="imp-step">
+                    <div class="imp-icon">4</div>
+                    <div class="imp-label">GPU eğitimi (RunPod)</div>
+                </div>
+                <div class="imp-connector"></div>
+                <div class="imp-step">
+                    <div class="imp-icon">5</div>
+                    <div class="imp-label">Model güncelleme</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>
