@@ -28,6 +28,7 @@ yarn-error.log
 datasets/
 models/
 *.pt
+*.pth
 *.tar.gz
 *.zip
 *.h5
