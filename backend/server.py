@@ -75,8 +75,10 @@ app.add_middleware(
 )
 
 # MongoDB connection
-MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017/autodamageid")
-DB_NAME = os.environ.get("DB_NAME", "autodamageid")
+MONGO_URL = os.environ.get("MONGO_URL")
+DB_NAME = os.environ.get("DB_NAME")
+if not MONGO_URL or not DB_NAME:
+    raise RuntimeError("MONGO_URL and DB_NAME environment variables must be set")
 client = MongoClient(MONGO_URL)
 db = client[DB_NAME]
 analyses_collection = db.analyses
@@ -161,52 +163,8 @@ def get_parts_model():
         parts_model_path = str(active_path)
     return parts_model
 
-# Damage type translations
-DAMAGE_TR = {
-    "crack": "Çatlak",
-    "dent": "Göçük",
-    "glass_shatter": "Cam Kırığı",
-    "lamp_broken": "Lamba Kırığı",
-    "scratch": "Çizik",
-    "tire_flat": "Patlak Lastik"
-}
-
-# Part name translations
-PARTS_TR = {
-    "back_bumper": "Arka Tampon",
-    "back_door": "Arka Kapı",
-    "back_glass": "Arka Cam",
-    "back_left_door": "Arka Sol Kapı",
-    "back_left_light": "Arka Sol Far",
-    "back_light": "Arka Far",
-    "back_right_door": "Arka Sağ Kapı",
-    "back_right_light": "Arka Sağ Far",
-    "front_bumper": "Ön Tampon",
-    "front_door": "Ön Kapı",
-    "front_glass": "Ön Cam",
-    "front_left_door": "Ön Sol Kapı",
-    "front_left_light": "Ön Sol Far",
-    "front_light": "Ön Far",
-    "front_right_door": "Ön Sağ Kapı",
-    "front_right_light": "Ön Sağ Far",
-    "hood": "Kaput",
-    "left_mirror": "Sol Ayna",
-    "object": "Nesne",
-    "right_mirror": "Sağ Ayna",
-    "tailgate": "Bagaj Kapağı",
-    "trunk": "Bagaj",
-    "wheel": "Tekerlek"
-}
-
-# Severity mapping based on damage type (base weights)
-SEVERITY_MAP = {
-    "crack": 3,
-    "dent": 3,
-    "glass_shatter": 5,
-    "lamp_broken": 4,
-    "scratch": 2,
-    "tire_flat": 4
-}
+# Import shared constants
+from constants import DAMAGE_TR, PARTS_TR, SEVERITY_MAP
 
 # Manual review confidence threshold
 REVIEW_CONFIDENCE_THRESHOLD = 35.0

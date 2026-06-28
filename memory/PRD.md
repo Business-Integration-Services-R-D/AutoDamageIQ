@@ -1,93 +1,93 @@
-# AutoDamageIQ — PRD (Product Requirements Document)
+# AutoDamageIQ - Ürün Gereksinimleri Dokümanı (PRD)
 
 ## Proje Tanımı
-AutoDamageIQ, araç dış ve iç görüntülerini analiz ederek filo yönetimi ve kiralama operasyonlarında hasar tespiti ve karar destek süreçlerini otomatikleştiren görüntü tabanlı YZ platformudur.
+Araç hasar tespiti ve analizi web uygulaması. YOLO modelleri ile hasar tespiti, parça segmentasyonu, SAM ile piksel hassasiyetinde alan hesaplama, VLM (GPT-4o) ile akıllı parça eşleme, MLOps pipeline (RunPod GPU eğitimi).
 
-## Teknoloji Yığını
-- **Frontend:** React, Axios, React Router, TailwindCSS, Framer Motion
-- **Backend:** FastAPI, PyTorch, Ultralytics YOLO, SAM (Segment Anything), MongoDB
-- **MLOps:** RunPod GPU API, otomatik eğitim scriptleri
-- **Dil:** Türkçe UI
+## Temel Gereksinimler
+1. Web UI: Görsel yükleme, analiz sonuçları, callout çizgileri
+2. Hasar tespiti: 6 sınıf (çatlak, göçük, cam kırığı, lamba kırığı, çizik, patlak lastik)
+3. Parça segmentasyonu: 23 araç parçası
+4. VLM Fallback: YOLO belirsiz kaldığında GPT-4o ile parça tespiti
+5. Şiddet hesaplama: Çok değişkenli (alan, güven, tip)
+6. Before/After karşılaştırma
+7. PDF rapor indirme
+8. Geçmiş analizler
+9. MLOps: RunPod ile eğitim, model yönetimi
 
-## Çekirdek Mimari
-```
-/app/
-├── backend/
-│   ├── server.py              # Ana FastAPI uygulaması
-│   ├── image_quality.py       # Görüntü kalite kontrol modülü
-│   ├── repair_engine.py       # Onarım tipi öneri motoru
-│   ├── anomaly_detector.py    # Anomali/tekrar görsel tespit modülü
-│   ├── sam_integration.py     # SAM piksel düzeyinde maske üretimi
-│   ├── before_after.py        # Before/After yeni hasar karşılaştırma
-│   ├── training_api.py        # Eğitim ve etiketleme API'si
-│   └── model_manager.py       # Model yönetimi
-├── frontend/src/pages/
-│   ├── UploadPage.js          # Görsel yükleme
-│   ├── ResultPage.js          # Analiz sonuçları
-│   ├── ComparePage.js         # Before/After karşılaştırma
-│   ├── HistoryPage.js         # Geçmiş analizler
-│   └── TrainingPage.js        # MLOps eğitim merkezi
-├── models/                     # Eğitilmiş .pt model dosyaları
-├── datasets/
-│   ├── unified/               # Birleşik eğitim veri seti (5370 görsel)
-│   └── scripts/
-│       ├── download_datasets.py
-│       └── merge_vehide.py    # VehiDE veri seti birleştirme
-├── training/
-│   ├── train_script.sh        # v8: YOLOv8m + AdamW + early stopping
-│   ├── train_carparts_seg.sh  # Parça segmentasyon eğitimi
-│   └── dataset.tar.gz         # Paketlenmiş eğitim verisi
-```
+## Tech Stack
+- **Frontend**: React, TailwindCSS, Framer Motion, Shadcn/UI
+- **Backend**: FastAPI, PyTorch, Ultralytics YOLO, SAM ViT-B, OpenCV
+- **Database**: MongoDB
+- **Entegrasyonlar**: RunPod (GPU), OpenAI GPT-4o (Emergent LLM Key)
 
 ## Tamamlanan Özellikler
 
-### Faz 1 — Çekirdek
-- [x] YOLOv8 hasar tespiti (6 sınıf) + YOLOv8-Seg parça segmentasyonu (23 sınıf)
-- [x] IoU tabanlı hasar–parça eşleme, şiddet indeksi, risk seviyesi
-- [x] PDF rapor, JSON API, MongoDB persistence, web arayüzü
+### Core
+- [x] Görsel yükleme ve YOLO ile hasar tespiti
+- [x] YOLOv8n-seg ile parça segmentasyonu
+- [x] YOLOv8m ile geliştirilmiş hasar modeli (birleşik veri seti 13K+ görsel)
+- [x] Hasar-parça eşleme (IoU tabanlı)
+- [x] Çok değişkenli şiddet hesaplama
+- [x] Onarım önerisi motoru
+- [x] Before/After karşılaştırma (ORB matching)
+- [x] PDF rapor indirme
+- [x] Geçmiş analizler ve detay görüntüleme
+- [x] Manuel inceleme kuyruğu
 
-### Faz 2 — MLOps
-- [x] RunPod GPU eğitim pipeline'ı, model versiyonlama, etiketleme aracı
-- [x] Özel hasar modeli (50 epoch) ve parça segmentasyon modeli (100 epoch) eğitimi
+### Kalite & Anomali
+- [x] Görüntü kalite değerlendirmesi (bulanıklık, parlaklık)
+- [x] Anomali tespiti (pHash ile duplike algılama)
 
-### Faz 3 — Ar-Ge Modüller (14 Nisan 2026)
-- [x] Görüntü kalite kontrolü (bulanıklık, pozlama, çözünürlük, yansıma, kontrast)
-- [x] Onarım tipi önerisi (6×5 hasar-şiddet matrisi, panel maliyet çarpanı)
-- [x] Manuel inceleme kuyruğu (düşük güven otomatik işaretleme)
-- [x] Gelişmiş çok değişkenli şiddet skoru
-- [x] Anomali/tekrar tespiti (perceptual hashing, piksel dağılım analizi)
+### MLOps
+- [x] RunPod ile eğitim başlatma ve takip
+- [x] Model yönetimi (listeleme, aktif yapma, silme)
+- [x] VLM labeler (GPT-4o ile otomatik etiketleme)
+- [x] Veri seti birleştirme (CarDD + VehiDE + HITL)
 
-### Faz 4 — SAM + Before/After (14 Nisan 2026)
-- [x] SAM ViT-B entegrasyonu (panel bazlı kalibrasyon, hasar tipi düzeltme faktörleri)
-- [x] Before/After karşılaştırma (ORB + homography + fark haritası)
-- [x] Karşılaştırma sayfası (frontend)
+### Production Fix & VLM (Şubat 2026)
+- [x] Graceful ML imports (production-safe, model dosyası yoksa çökmez)
+- [x] Hardcoded RunPod API key temizliği
+- [x] Health endpoint: model ve VLM durumu raporlama
+- [x] VLM Fallback: Belirsiz parça eşleşmelerinde GPT-4o devreye girer
+- [x] Frontend VLM badge gösterimi (mor "VLM" etiketi)
+- [x] DRY: Paylaşılan sabitler modülü (constants.py)
+- [x] datetime.utcnow() → datetime.now(timezone.utc)
 
-### Faz 5 — Model İyileştirme Altyapısı (15 Nisan 2026)
-- [x] Eğitim scripti v8: YOLOv8n → YOLOv8m (25M param), AdamW, early stopping (patience=25)
-- [x] Agresif augmentation: mosaic, mixup, HSV jitter, scale, cosine LR
-- [x] GPU belleğine göre otomatik batch size ayarlama
-- [x] VehiDE veri seti birleştirme scripti (Kaggle -> YOLO format dönüşümü)
-- [x] Varsayılan eğitim konfigürasyonu güncelleme (frontend + backend)
+## Bekleyen Görevler
 
-## Bekleyen / Gelecek Görevler
+### P1
+- [ ] Annotation Tool: Yanlış tahminleri düzeltmek için bounding box editörü
+- [ ] server.py refactoring (~1200 satır → APIRouter modülleri)
 
-### P0 — Aktif (RunPod'da eğitim başlatılacak)
-- [ ] YOLOv8m ile yeni model eğitimi (mevcut veri setiyle)
-- [ ] VehiDE veri setini Kaggle'dan indirip birleştirme (11K+ görsel)
-- [ ] Birleşik veri setiyle ikinci eğitim turu
+### P2
+- [ ] Gelişmiş anomali tespiti (EXIF, ELA, visual-text consistency)
 
-### P1 — Sonraki Adımlar
-- [ ] Ar-Ge dokümanlarındaki tutarsızlıklar (Makale 5 tarihi: 2019→2022)
-- [ ] YOLO11m-seg'e geçiş değerlendirmesi (makaledeki model)
-- [ ] Humans in the Loop veri seti ile parça modeli iyileştirme
-
-### P2 — Orta Öncelik
-- [ ] server.py modüler refactoring (APIRouter)
-- [ ] Araç içi hasar analizi
-- [ ] Gelişmiş anomali (EXIF, ELA)
-- [ ] Tahmini onarım maliyeti
-
-### P3 — Düşük Öncelik
+### P3
+- [ ] İç mekan hasar analizi
+- [ ] Domain adaptation panel eşleştirme
 - [ ] Dark mode
-- [ ] Kapsamlı test suite
-- [ ] TrainingPage.js component refactoring
+
+## Mimari
+
+```
+/app/
+├── backend/
+│   ├── server.py              # Ana FastAPI uygulama
+│   ├── constants.py           # Paylaşılan sabitler (DAMAGE_TR, PARTS_TR)
+│   ├── vlm_parts_fallback.py  # GPT-4o VLM parça tespiti
+│   ├── training_api.py        # RunPod eğitim API
+│   ├── model_manager.py       # Model yönetimi
+│   ├── sam_integration.py     # SAM ViT-B entegrasyonu
+│   ├── before_after.py        # ORB karşılaştırma
+│   ├── anomaly_detector.py    # pHash anomali
+│   ├── image_quality.py       # Kalite değerlendirme
+│   ├── repair_engine.py       # Onarım önerisi
+│   └── vlm_labeler.py         # GPT-4o otomatik etiketleme
+├── frontend/
+│   └── src/pages/
+│       ├── UploadPage.js
+│       ├── ResultPage.js
+│       ├── ComparePage.js
+│       └── TrainingPage.js
+└── models/                    # .pt model dosyaları (gitignored)
+```

@@ -21,16 +21,9 @@ from typing import Optional, Dict, List, Any
 
 logger = logging.getLogger("autodamageid.vlm_parts")
 
-EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
+from constants import VALID_PARTS
 
-# Geçerli parça isimleri (YOLO modeli ile uyumlu)
-VALID_PARTS = [
-    "back_bumper", "back_door", "back_glass", "back_left_door",
-    "back_left_light", "back_light", "back_right_door", "back_right_light",
-    "front_bumper", "front_door", "front_glass", "front_left_door",
-    "front_left_light", "front_light", "front_right_door", "front_right_light",
-    "hood", "left_mirror", "right_mirror", "tailgate", "trunk", "wheel"
-]
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
 
 SYSTEM_PROMPT = """Sen bir araç hasar uzmanısın. Sana bir araç hasarının kırpılmış görselini vereceğim.
 Görevlerin:
@@ -148,21 +141,8 @@ async def enhance_damages_with_vlm(
     - IoU < iou_threshold olan hasarlar (parça bulunamadı) → VLM'e gönder
     - VLM sonucu confidence >= 0.5 ise parçayı güncelle
     """
+    from constants import PARTS_TR
     from repair_engine import get_repair_recommendation
-
-    PARTS_TR = {
-        "back_bumper": "Arka Tampon", "back_door": "Arka Kapı",
-        "back_glass": "Arka Cam", "back_left_door": "Arka Sol Kapı",
-        "back_left_light": "Arka Sol Far", "back_light": "Arka Far",
-        "back_right_door": "Arka Sağ Kapı", "back_right_light": "Arka Sağ Far",
-        "front_bumper": "Ön Tampon", "front_door": "Ön Kapı",
-        "front_glass": "Ön Cam", "front_left_door": "Ön Sol Kapı",
-        "front_left_light": "Ön Sol Far", "front_light": "Ön Far",
-        "front_right_door": "Ön Sağ Kapı", "front_right_light": "Ön Sağ Far",
-        "hood": "Kaput", "left_mirror": "Sol Ayna",
-        "right_mirror": "Sağ Ayna", "tailgate": "Bagaj Kapağı",
-        "trunk": "Bagaj", "wheel": "Tekerlek"
-    }
 
     enhanced = []
     vlm_tasks = []
