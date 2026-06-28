@@ -19,7 +19,7 @@ from typing import Dict, List, Any, Optional
 from pydantic import BaseModel
 
 # RunPod API
-RUNPOD_API_KEY = os.environ.get("RUNPOD_API_KEY", "rpa_922SQN16CHBYBWAOM9D4DT5ZPXYKB6B8CDEX7FNDaob1f6")
+RUNPOD_API_KEY = os.environ.get("RUNPOD_API_KEY")
 RUNPOD_GRAPHQL_URL = "https://api.runpod.io/graphql"
 
 # Paths

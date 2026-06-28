@@ -359,6 +359,9 @@ const ResultPage = () => {
                     {damage.part_tr && (
                       <p className="text-xs text-apple-secondary mb-1">
                         {damage.part_tr}
+                        {damage.part_source === 'vlm' && (
+                          <span className="ml-1.5 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] font-medium">VLM</span>
+                        )}
                       </p>
                     )}
                     <div className="flex items-center justify-between">
@@ -475,6 +478,9 @@ const ResultPage = () => {
                         </div>
                         <p className="text-sm text-apple-secondary">
                           {damage.part_tr || 'Belirsiz parca'}
+                          {damage.part_source === 'vlm' && (
+                            <span className="ml-1.5 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] font-medium" data-testid={`vlm-badge-${index}`}>VLM</span>
+                          )}
                         </p>
                       </div>
                       <SeverityDots severity={damage.severity} />

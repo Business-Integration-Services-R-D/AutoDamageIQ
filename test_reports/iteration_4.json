@@ -1,0 +1,48 @@
+{
+  "summary": "Verified production-fix + VLM fallback feature. /api/health exposes ml_available, damage_model, parts_model, vlm_available. /api/analyze returns damages enriched with 'part_source' (yolo/vlm/none) and a 'vlm_enhanced' count. On crash_6.jpg, 4 damages detected and 2 of them were enhanced by GPT-4o VLM (Arka Tampon, Kaput). PDF, history list, detail, and quality-check endpoints all work. Frontend renders purple 'VLM' badge correctly next to part_tr.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_vlm_fallback.py",
+    "/app/test_reports/pytest/pytest_vlm_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is 1259 lines - exceeds 700-line threshold; consider splitting analysis/training/compare routers into separate modules.",
+    "MONGO_URL has a hardcoded fallback default in server.py line 78 ('mongodb://localhost:27017/autodamageid') - per env rules, defaults should be omitted so missing config fails fast. Same for DB_NAME (line 79).",
+    "vlm_parts_fallback.py imports inside function (emergentintegrations) which is fine for optionality, but errors are swallowed broadly; consider distinguishing API key missing vs. transient failure for better observability.",
+    "analyses_collection.find().sort().limit() in /api/analyses returns image_base64 implicitly excluded only via the listed-fields dict comprehension; ensure large payloads aren't streamed. (Current code looks OK - listing endpoint maps fields.)",
+    "PARTS_TR table is duplicated between server.py and vlm_parts_fallback.py - DRY violation; extract to a shared constants module."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_vlm_fallback.py"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 tests passed)",
+    "frontend": "100% (upload -> analyze -> result with VLM badges -> history all working)"
+  },
+  "test_credentials": "No authentication required",
+  "seed_data_creation": "Multiple analyses were created during testing using /app/assets/crash_1.jpg and crash_6.jpg",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "VLM fallback is fully functional. crash_6.jpg reliably produces 2 VLM-enhanced damages out of 4. Health endpoint exposes vlm_available which reflects EMERGENT_LLM_KEY presence. Each damage carries 'part_source' in {yolo, vlm, none}; VLM-enhanced damages additionally have vlm_confidence (>=0.5) and vlm_reasoning. Frontend renders <span data-testid='vlm-badge-{index}'>VLM</span>. PDF endpoint /api/analyses/{id}/pdf returns valid PDF (magic header %PDF). MongoDB _id is not leaked in API responses.",
+  "features_verified": {
+    "health_fields": "PASS - ml_available=true, damage_model=/app/models/autodamage_best.pt, parts_model=/app/models/carparts_seg_best.pt, vlm_available=true",
+    "analyze_part_source": "PASS - all damages have part_source in {yolo, vlm, none}",
+    "vlm_fallback_trigger": "PASS - crash_6.jpg: 4 damages, sources=['yolo','vlm','vlm','yolo'], vlm_enhanced=2",
+    "vlm_metadata": "PASS - VLM-enhanced damages have part, part_tr, vlm_confidence>=0.5",
+    "analyses_list_persistence": "PASS - GET /api/analyses returns recently created analysis",
+    "analyses_detail": "PASS - GET /api/analyses/{id} returns full data without MongoDB _id leak",
+    "pdf_download": "PASS - returns application/pdf with %PDF magic bytes",
+    "quality_check": "PASS - /api/quality-check works independently of analyze",
+    "frontend_load": "PASS - Turkish UI loads correctly at root URL",
+    "frontend_vlm_badge": "PASS - 2 purple 'VLM' badges visible on result page for crash_6.jpg"
+  }
+}

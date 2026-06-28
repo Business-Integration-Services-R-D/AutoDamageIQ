@@ -85,15 +85,14 @@ analyses_collection = db.analyses
 YOLO_DIR = Path(__file__).parent.parent / "src" / "yolo"
 MODELS_DIR = Path("/app/models")
 DEFAULT_DAMAGE_MODEL_PATH = YOLO_DIR / "weights" / "best.pt"
-# Yeni eğitilmiş parça segmentasyonu modeli
 CUSTOM_PARTS_MODEL_PATH = MODELS_DIR / "carparts_seg_best.pt"
 DEFAULT_PARTS_MODEL_PATH = YOLO_DIR / "runs" / "carparts_seg_v1" / "weights" / "best.pt"
 
 # Load models (lazy loading)
 damage_model = None
-damage_model_path = None  # Track current model path
+damage_model_path = None
 parts_model = None
-parts_model_path = None  # Track current parts model path
+parts_model_path = None
 
 def get_active_damage_model_path():
     """Aktif hasar modelinin yolunu al"""
@@ -105,32 +104,48 @@ def get_active_damage_model_path():
             path = model_info.get("path")
             if path and Path(path).exists():
                 return Path(path)
-    return DEFAULT_DAMAGE_MODEL_PATH
+    if DEFAULT_DAMAGE_MODEL_PATH.exists():
+        return DEFAULT_DAMAGE_MODEL_PATH
+    return None
 
 def get_active_parts_model_path():
     """Aktif parça segmentasyonu modelinin yolunu al"""
     if CUSTOM_PARTS_MODEL_PATH.exists():
         return CUSTOM_PARTS_MODEL_PATH
-    return DEFAULT_PARTS_MODEL_PATH
+    if DEFAULT_PARTS_MODEL_PATH.exists():
+        return DEFAULT_PARTS_MODEL_PATH
+    return None
 
 def _load_yolo_model(model_path):
     """Safely load a YOLO model with weights_only=False patch"""
-    original_load = torch.load
-    def patched_load(*args, **kwargs):
-        kwargs['weights_only'] = False
-        return original_load(*args, **kwargs)
-    torch.load = patched_load
+    if not _ml_available or YOLO is None:
+        return None
+    if model_path is None or not Path(model_path).exists():
+        logger.warning(f"Model file not found: {model_path}")
+        return None
     try:
-        model = YOLO(str(model_path))
-    finally:
-        torch.load = original_load
-    return model
+        import torch as _torch
+        original_load = _torch.load
+        def patched_load(*args, **kwargs):
+            kwargs['weights_only'] = False
+            return original_load(*args, **kwargs)
+        _torch.load = patched_load
+        try:
+            model = YOLO(str(model_path))
+        finally:
+            _torch.load = original_load
+        return model
+    except Exception as e:
+        logger.error(f"Model loading failed for {model_path}: {e}")
+        return None
 
 def get_damage_model():
     global damage_model, damage_model_path
     active_path = get_active_damage_model_path()
+    if active_path is None:
+        return None
     if damage_model is None or damage_model_path != str(active_path):
-        print(f"Loading damage model from {active_path}")
+        logger.info(f"Loading damage model from {active_path}")
         damage_model = _load_yolo_model(active_path)
         damage_model_path = str(active_path)
     return damage_model
@@ -138,8 +153,10 @@ def get_damage_model():
 def get_parts_model():
     global parts_model, parts_model_path
     active_path = get_active_parts_model_path()
+    if active_path is None:
+        return None
     if parts_model is None or parts_model_path != str(active_path):
-        print(f"Loading parts model from {active_path}")
+        logger.info(f"Loading parts model from {active_path}")
         parts_model = _load_yolo_model(active_path)
         parts_model_path = str(active_path)
     return parts_model
@@ -298,7 +315,14 @@ def analyze_image(image_np: np.ndarray, enable_sam: bool = True) -> Dict[str, An
     """Run damage detection and parts segmentation on image"""
     
     damage_mod = get_damage_model()
+    if damage_mod is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Hasar tespit modeli yüklenemedi. Model dosyaları mevcut değil veya ML kütüphaneleri yüklü değil."
+        )
+    
     parts_mod = get_parts_model()
+    # parts_mod None olabilir - VLM fallback devreye girer
     
     h, w = image_np.shape[:2]
     
@@ -310,26 +334,27 @@ def analyze_image(image_np: np.ndarray, enable_sam: bool = True) -> Dict[str, An
         verbose=False
     )[0]
     
-    # Run parts segmentation
-    parts_results = parts_mod.predict(
-        source=image_np,
-        imgsz=640,
-        conf=0.15,
-        verbose=False
-    )[0]
+    # Run parts segmentation (eğer model varsa)
+    part_boxes = np.zeros((0, 4))
+    part_cls = np.zeros((0,), int)
+    part_names = {}
+    
+    if parts_mod is not None:
+        parts_results = parts_mod.predict(
+            source=image_np,
+            imgsz=640,
+            conf=0.15,
+            verbose=False
+        )[0]
+        part_boxes = parts_results.boxes.xyxy.cpu().numpy() if parts_results.boxes is not None else np.zeros((0, 4))
+        part_cls = parts_results.boxes.cls.cpu().numpy().astype(int) if parts_results.boxes is not None else np.zeros((0,), int)
+        part_names = parts_mod.names
     
     # Extract damage boxes
     dmg_boxes = damage_results.boxes.xyxy.cpu().numpy() if damage_results.boxes is not None else np.zeros((0, 4))
     dmg_cls = damage_results.boxes.cls.cpu().numpy().astype(int) if damage_results.boxes is not None else np.zeros((0,), int)
     dmg_conf = damage_results.boxes.conf.cpu().numpy() if damage_results.boxes is not None else np.zeros((0,))
     dmg_names = damage_mod.names
-    
-    # Extract part boxes
-    part_boxes = parts_results.boxes.xyxy.cpu().numpy() if parts_results.boxes is not None else np.zeros((0, 4))
-    part_cls = parts_results.boxes.cls.cpu().numpy().astype(int) if parts_results.boxes is not None else np.zeros((0,), int)
-    part_names = parts_mod.names
-    
-    # Match damages to parts
     damages = []
     for i, dmg_box in enumerate(dmg_boxes):
         best_iou = 0.0
@@ -460,7 +485,18 @@ class AnalysisListItem(BaseModel):
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "service": "AutoDamageID"}
+    damage_path = get_active_damage_model_path()
+    parts_path = get_active_parts_model_path()
+    return {
+        "status": "healthy",
+        "service": "AutoDamageID",
+        "ml_available": _ml_available,
+        "ml_error": _ml_import_error,
+        "damage_model": str(damage_path) if damage_path else None,
+        "parts_model": str(parts_path) if parts_path else None,
+        "sam_available": is_sam_available(),
+        "vlm_available": bool(os.environ.get("EMERGENT_LLM_KEY"))
+    }
 
 @app.post("/api/analyze", response_model=AnalysisResponse)
 async def analyze_vehicle(file: UploadFile = File(...)):
@@ -495,6 +531,27 @@ async def analyze_vehicle(file: UploadFile = File(...)):
     # Step 5: Run damage analysis (even if quality is low, but add warning)
     results = analyze_image(image_np)
     
+    # Step 6: VLM Fallback - belirsiz parça eşleşmeleri için GPT-4o
+    try:
+        from vlm_parts_fallback import enhance_damages_with_vlm
+        unmatched = [d for d in results["damages"] if d.get("part") is None]
+        if unmatched:
+            results["damages"] = await enhance_damages_with_vlm(image_np, results["damages"])
+            vlm_enhanced_count = sum(1 for d in results["damages"] if d.get("part_source") == "vlm")
+            results["vlm_enhanced"] = vlm_enhanced_count
+            # Etkilenen parça sayısını güncelle
+            results["summary"]["affected_parts"] = len(set(
+                d["part"] for d in results["damages"] if d.get("part")
+            ))
+            logger.info(f"VLM enhanced {vlm_enhanced_count} damages")
+        else:
+            results["vlm_enhanced"] = 0
+            for d in results["damages"]:
+                d["part_source"] = "yolo"
+    except Exception as e:
+        logger.warning(f"VLM fallback skipped: {e}")
+        results["vlm_enhanced"] = 0
+    
     # Ensure all numpy types are converted to native Python types
     results = convert_to_native_types(results)
     
@@ -528,7 +585,7 @@ async def analyze_vehicle(file: UploadFile = File(...)):
     
     # Create analysis record
     analysis_id = str(uuid.uuid4())
-    created_at = datetime.utcnow().isoformat()
+    created_at = datetime.now(timezone.utc).isoformat()
     
     analysis_doc = {
         "_id": analysis_id,
