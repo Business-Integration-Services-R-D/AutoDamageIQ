@@ -2,8 +2,8 @@ import os
 import sys
 import uuid
 import base64
-import torch
-from datetime import datetime
+import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from io import BytesIO
@@ -21,24 +21,42 @@ from PIL import Image
 # Load environment variables
 load_dotenv()
 
-# Fix for PyTorch 2.6+ weights_only issue
-torch.serialization.add_safe_globals([])
+logger = logging.getLogger("autodamageid")
 
-# Add src path for YOLO models
-SRC_PATH = Path(__file__).parent.parent / "src"
-sys.path.insert(0, str(SRC_PATH))
+# --- Graceful ML imports (production-safe) ---
+_ml_available = False
+_ml_import_error = None
+YOLO = None
 
-# Set environment variable to allow unsafe loading for YOLO models
-os.environ['TORCH_FORCE_WEIGHTS_ONLY_LOAD'] = '0'
+try:
+    import torch
+    torch.serialization.add_safe_globals([])
+    os.environ['TORCH_FORCE_WEIGHTS_ONLY_LOAD'] = '0'
 
-from ultralytics import YOLO
+    SRC_PATH = Path(__file__).parent.parent / "src"
+    sys.path.insert(0, str(SRC_PATH))
 
-# Import new modules
+    from ultralytics import YOLO as _YOLO
+    YOLO = _YOLO
+    _ml_available = True
+    logger.info("ML libraries (PyTorch + YOLO) loaded successfully")
+except Exception as e:
+    _ml_import_error = str(e)
+    logger.warning(f"ML libraries not available: {e}. Analysis endpoints will return errors.")
+
+# Import lightweight modules (always available)
 from image_quality import assess_image_quality
 from repair_engine import get_repair_recommendation
 from anomaly_detector import compute_phash, check_duplicate_image, generate_anomaly_score
-from sam_integration import is_sam_available, enhance_damages_with_sam, get_sam_status
 from before_after import compare_analyses
+
+# Conditional SAM import
+try:
+    from sam_integration import is_sam_available, enhance_damages_with_sam, get_sam_status
+except Exception:
+    def is_sam_available(): return False
+    def enhance_damages_with_sam(img, damages): return damages
+    def get_sam_status(): return {"available": False, "reason": "SAM module not loaded"}
 
 # Initialize FastAPI
 app = FastAPI(
